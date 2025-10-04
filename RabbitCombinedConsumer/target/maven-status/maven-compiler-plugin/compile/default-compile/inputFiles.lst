@@ -1,0 +1,11 @@
+/Users/james/Desktop/0_NEU_CSA/CS6620_CloudCompute/cs6620-Rabbit-ticket/RabbitCombinedConsumer/src/main/java/org/java/rabbitcombinedconsumer/model/TicketCreation.java
+/Users/james/Desktop/0_NEU_CSA/CS6620_CloudCompute/cs6620-Rabbit-ticket/RabbitCombinedConsumer/src/main/java/org/java/rabbitcombinedconsumer/config/RabbitFactory.java
+/Users/james/Desktop/0_NEU_CSA/CS6620_CloudCompute/cs6620-Rabbit-ticket/RabbitCombinedConsumer/src/main/java/org/java/rabbitcombinedconsumer/repository/mysql/MySqlTicketDao.java
+/Users/james/Desktop/0_NEU_CSA/CS6620_CloudCompute/cs6620-Rabbit-ticket/RabbitCombinedConsumer/src/main/java/org/java/rabbitcombinedconsumer/dto/MqDTO.java
+/Users/james/Desktop/0_NEU_CSA/CS6620_CloudCompute/cs6620-Rabbit-ticket/RabbitCombinedConsumer/src/main/java/org/java/rabbitcombinedconsumer/mapper/MqMapper.java
+/Users/james/Desktop/0_NEU_CSA/CS6620_CloudCompute/cs6620-Rabbit-ticket/RabbitCombinedConsumer/src/main/java/org/java/rabbitcombinedconsumer/model/TicketStatus.java
+/Users/james/Desktop/0_NEU_CSA/CS6620_CloudCompute/cs6620-Rabbit-ticket/RabbitCombinedConsumer/src/main/java/org/java/rabbitcombinedconsumer/repository/MySqlTicketDAOInterface.java
+/Users/james/Desktop/0_NEU_CSA/CS6620_CloudCompute/cs6620-Rabbit-ticket/RabbitCombinedConsumer/src/main/java/org/java/rabbitcombinedconsumer/RabbitCombinedConsumerApplication.java
+/Users/james/Desktop/0_NEU_CSA/CS6620_CloudCompute/cs6620-Rabbit-ticket/RabbitCombinedConsumer/src/main/java/org/java/rabbitcombinedconsumer/model/TicketInfo.java
+/Users/james/Desktop/0_NEU_CSA/CS6620_CloudCompute/cs6620-Rabbit-ticket/RabbitCombinedConsumer/src/main/java/org/java/rabbitcombinedconsumer/dto/TicketInfoDTO.java
+/Users/james/Desktop/0_NEU_CSA/CS6620_CloudCompute/cs6620-Rabbit-ticket/RabbitCombinedConsumer/src/main/java/org/java/rabbitcombinedconsumer/service/rabbitmq/RabbitMySqlConsumer.java

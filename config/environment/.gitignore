@@ -1,0 +1,13 @@
+# Active environment file (auto-generated, contains sensitive data)
+.env
+
+# Backup files (local only)
+.env.backup
+
+# AWS environment (contains sensitive credentials)
+.env.aws
+
+# Legacy files (if any)
+.env.personal
+.env.template
+
