@@ -9,12 +9,6 @@ spring:
     compose:
       enabled: false
 
-  rabbitmq:
-    host: ${SPRING_RABBITMQ_HOST}
-    port: ${SPRING_RABBITMQ_PORT:5672}
-    username: ${SPRING_RABBITMQ_USERNAME}
-    password: ${SPRING_RABBITMQ_PASSWORD}
-
   datasource:
     url: ${SPRING_DATASOURCE_URL}
     username: ${SPRING_DATASOURCE_USERNAME}
@@ -27,14 +21,28 @@ spring:
 
   jpa:
     hibernate:
-      ddl-auto: validate 
-    show-sql: true 
+      ddl-auto: validate
+    show-sql: true
     defer-datasource-initialization: true
   sql:
     init:
       mode: always
       continue-on-error: true
       separator: ";"
+
+cloud:
+  aws:
+    region:
+      static: ${AWS_REGION:us-west-2}
+    credentials:
+      access-key: ${AWS_ACCESS_KEY_ID:dummy}
+      secret-key: ${AWS_SECRET_ACCESS_KEY:dummy}
+    endpoint:
+      sqs: ${AWS_SQS_ENDPOINT:}
+
+sqs:
+  queue:
+    ticket-sql-name: ${SQS_TICKET_SQL_QUEUE:ticketSQL}
 
 logging:
   file:
