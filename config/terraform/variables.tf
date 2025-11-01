@@ -147,3 +147,27 @@ variable "service_image_tags" {
   type        = map(string)
   default     = {}
 }
+
+# ==============================================================================
+# AUTO SCALING OVERRIDES
+# ==============================================================================
+
+variable "ecs_autoscaling_overrides" {
+  description = "Override auto scaling settings per service"
+  type = map(object({
+    min_capacity       = optional(number, 1)
+    max_capacity       = optional(number, 3)
+    cpu_target_value   = optional(number, 70)
+    scale_in_cooldown  = optional(number, 300)
+    scale_out_cooldown = optional(number, 300)
+  }))
+  default = {
+    "purchase-service" = {
+      min_capacity       = 3
+      max_capacity       = 6
+      cpu_target_value   = 60
+      scale_in_cooldown  = 120
+      scale_out_cooldown = 60
+    }
+  }
+}

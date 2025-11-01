@@ -9,6 +9,17 @@ locals {
       image_tag = lookup(var.service_image_tags, service, cfg.image_tag)
     })
   }
+
+  # Auto scaling configuration with overrides
+  ecs_autoscaling_configs = {
+    for service, _ in local.app_services : service => {
+      min_capacity       = try(var.ecs_autoscaling_overrides[service].min_capacity, 1)
+      max_capacity       = try(var.ecs_autoscaling_overrides[service].max_capacity, 3)
+      cpu_target_value   = try(var.ecs_autoscaling_overrides[service].cpu_target_value, 70)
+      scale_in_cooldown  = try(var.ecs_autoscaling_overrides[service].scale_in_cooldown, 300)
+      scale_out_cooldown = try(var.ecs_autoscaling_overrides[service].scale_out_cooldown, 300)
+    }
+  }
 }
 
 # ==============================================================================
@@ -42,12 +53,27 @@ module "logging" {
 }
 
 # ==============================================================================
+# ALB Module - Application Load Balancer (per service)
+# ==============================================================================
+module "alb" {
+  for_each            = local.app_services
+  source              = "./modules/alb"
+  service_name        = each.key
+  vpc_id              = module.network[each.key].vpc_id
+  subnet_ids          = module.network[each.key].subnet_ids
+  security_group_id   = module.network[each.key].security_group_id
+  container_port      = each.value.container_port
+  health_check_path   = "/health"
+}
+
+# ==============================================================================
 # ECS Module - Cluster, task definition, and service (per service)
 # ==============================================================================
 module "ecs" {
   for_each           = local.app_services
   source             = "./modules/ecs"
   service_name       = each.key
+  service_type       = "combined"  # All services are combined (HTTP + messaging)
   image              = "${module.ecr[each.key].repository_url}:${each.value.image_tag}"
   container_port     = each.value.container_port
   subnet_ids         = module.network[each.key].subnet_ids
@@ -59,6 +85,13 @@ module "ecs" {
   region             = var.aws_region
   cpu                = each.value.cpu
   memory             = each.value.memory
+  target_group_arn   = module.alb[each.key].target_group_arn
+  enable_autoscaling = true
+  autoscaling_min_capacity = local.ecs_autoscaling_configs[each.key].min_capacity
+  autoscaling_max_capacity = local.ecs_autoscaling_configs[each.key].max_capacity
+  autoscaling_target_cpu   = local.ecs_autoscaling_configs[each.key].cpu_target_value
+  autoscaling_scale_in_cooldown  = local.ecs_autoscaling_configs[each.key].scale_in_cooldown
+  autoscaling_scale_out_cooldown = local.ecs_autoscaling_configs[each.key].scale_out_cooldown
 }
 
 # ==============================================================================

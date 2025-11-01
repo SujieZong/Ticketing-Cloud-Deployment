@@ -12,3 +12,18 @@ output "ecr_repository_urls" {
   description = "Map of service identifiers to their corresponding ECR repository URLs."
   value       = { for service, module_data in module.ecr : service => module_data.repository_url }
 }
+
+output "alb_dns_names" {
+  description = "Map of service identifiers to their ALB DNS names."
+  value       = { for service, module_data in module.alb : service => module_data.alb_dns_name }
+}
+
+output "sns_topic_arn" {
+  description = "ARN of the SNS topic for ticket events"
+  value       = module.messaging.sns_topic_arn
+}
+
+output "sqs_queue_url" {
+  description = "URL of the SQS queue for ticket processing"
+  value       = module.messaging.sqs_queue_url
+}

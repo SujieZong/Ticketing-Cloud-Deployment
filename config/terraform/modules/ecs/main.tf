@@ -47,4 +47,53 @@ resource "aws_ecs_service" "this" {
     security_groups  = var.security_group_ids
     assign_public_ip = true
   }
+
+
+  # ALB integration for receiver and combined services
+  dynamic "load_balancer" {
+    for_each = (var.service_type == "receiver" || var.service_type == "combined") && var.target_group_arn != "" ? [1] : []
+    content {
+      target_group_arn = var.target_group_arn
+      container_name   = "${var.service_name}-container"
+      container_port   = var.container_port
+    }
+  }
+
+  # Required for ALB integration
+  health_check_grace_period_seconds = (var.service_type == "receiver" || var.service_type == "combined") && var.target_group_arn != "" ? 60 : null
 }
+
+# ==============================================================================
+# Auto Scaling Configuration
+# ==============================================================================
+
+# Auto Scaling Target
+resource "aws_appautoscaling_target" "ecs" {
+  count              = var.enable_autoscaling ? 1 : 0
+  max_capacity       = var.autoscaling_max_capacity
+  min_capacity       = var.autoscaling_min_capacity
+  resource_id        = "service/${aws_ecs_cluster.this.name}/${aws_ecs_service.this.name}"
+  scalable_dimension = "ecs:service:DesiredCount"
+  service_namespace  = "ecs"
+}
+
+# Auto Scaling Policy - CPU Based
+resource "aws_appautoscaling_policy" "ecs_cpu" {
+  count              = var.enable_autoscaling ? 1 : 0
+  name               = "${var.service_name}-cpu-autoscaling"
+  policy_type        = "TargetTrackingScaling"
+  resource_id        = aws_appautoscaling_target.ecs[0].resource_id
+  scalable_dimension = aws_appautoscaling_target.ecs[0].scalable_dimension
+  service_namespace  = aws_appautoscaling_target.ecs[0].service_namespace
+
+  target_tracking_scaling_policy_configuration {
+    predefined_metric_specification {
+      predefined_metric_type = "ECSServiceAverageCPUUtilization"
+    }
+
+    target_value       = var.autoscaling_target_cpu
+    scale_in_cooldown  = var.autoscaling_scale_in_cooldown
+    scale_out_cooldown = var.autoscaling_scale_out_cooldown
+  }
+}
+

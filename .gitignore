@@ -33,3 +33,7 @@ docker-compose.override.yml
 
 config/terraform.md
 config/terraform/terraform.tfvars
+config/terraform/.terraform/
+config/terraform/.terraform.lock.hcl
+*.tfstate
+*.tfstate.backup

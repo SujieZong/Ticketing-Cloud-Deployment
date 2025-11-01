@@ -3,6 +3,15 @@ variable "service_name" {
   description = "Base name for ECS resources"
 }
 
+variable "service_type" {
+  type        = string
+  description = "Type of service: 'receiver' (HTTP only), 'processor' (SQS only), or 'combined' (both HTTP and SQS)"
+  validation {
+    condition     = contains(["receiver", "processor", "combined"], var.service_type)
+    error_message = "Service type must be 'receiver', 'processor', or 'combined'."
+  }
+}
+
 variable "image" {
   type        = string
   description = "ECR image URI (with tag)"
@@ -59,4 +68,68 @@ variable "memory" {
   type        = string
   default     = "512"
   description = "Memory (MiB)"
+}
+
+
+# ALB Integration (only for receiver service)
+variable "target_group_arn" {
+  type        = string
+  default     = ""
+  description = "ARN of the target group for ALB integration"
+}
+
+variable "alb_listener_arn" {
+  type        = string
+  default     = ""
+  description = "ARN of the ALB listener (for dependency)"
+}
+
+# Messaging Configuration (for processor service)
+variable "sns_topic_arn" {
+  type        = string
+  default     = ""
+  description = "ARN of SNS topic for publishing events"
+}
+
+variable "sqs_queue_url" {
+  type        = string
+  default     = ""
+  description = "URL of SQS queue for consuming messages"
+}
+
+# Auto Scaling Configuration
+variable "enable_autoscaling" {
+  type        = bool
+  default     = false
+  description = "Enable auto scaling for ECS service"
+}
+
+variable "autoscaling_min_capacity" {
+  type        = number
+  default     = 2
+  description = "Minimum number of tasks"
+}
+
+variable "autoscaling_max_capacity" {
+  type        = number
+  default     = 4
+  description = "Maximum number of tasks"
+}
+
+variable "autoscaling_target_cpu" {
+  type        = number
+  default     = 70
+  description = "Target CPU utilization percentage"
+}
+
+variable "autoscaling_scale_in_cooldown" {
+  type        = number
+  default     = 300
+  description = "Scale-in cooldown in seconds"
+}
+
+variable "autoscaling_scale_out_cooldown" {
+  type        = number
+  default     = 300
+  description = "Scale-out cooldown in seconds"
 }
