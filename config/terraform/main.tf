@@ -60,3 +60,16 @@ module "ecs" {
   cpu                = each.value.cpu
   memory             = each.value.memory
 }
+
+# ==============================================================================
+# Messaging Module - Shared SNS topic and SQS queue for ticket events
+# ==============================================================================
+module "messaging" {
+  source         = "./modules/messaging"
+  service_name   = "ticketing-message"
+  sns_topic_name = var.sns_topic_name
+  sqs_queue_name = var.sqs_queue_name
+  visibility_timeout_seconds = var.sqs_visibility_timeout_seconds
+  message_retention_seconds  = var.sqs_message_retention_seconds
+  receive_wait_time_seconds  = var.sqs_receive_wait_time_seconds
+}

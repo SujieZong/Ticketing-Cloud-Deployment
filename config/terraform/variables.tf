@@ -1,26 +1,37 @@
-# Optional AWS credentials (leave blank when using IAM roles / GitHub OIDC)
+# ==============================================================================
+# AWS CREDENTIALS & REGION CONFIGURATION
+# ==============================================================================
+
 variable "aws_access_key_id" {
   type      = string
   default   = ""
   sensitive = true
+  description = "AWS access key ID for authentication"
 }
 
 variable "aws_secret_access_key" {
   type      = string
   default   = ""
   sensitive = true
+  description = "AWS secret access key for authentication"
 }
 
 variable "aws_session_token" {
   type      = string
   default   = ""
   sensitive = true
+  description = "AWS session token for temporary credentials"
 }
 
 variable "aws_region" {
-  type    = string
-  default = "us-west-2"
+  type        = string
+  default     = "us-west-2"
+  description = "AWS region where resources will be deployed"
 }
+
+# ==============================================================================
+# IAM ROLES & PERMISSIONS
+# ==============================================================================
 
 variable "execution_role_arn" {
   type        = string
@@ -34,19 +45,66 @@ variable "task_role_arn" {
   default     = "arn:aws:iam::589535382240:role/LabRole"
 }
 
+# ==============================================================================
+# LOGGING CONFIGURATION
+# ==============================================================================
+
 variable "log_retention_days" {
-  type    = number
-  default = 7
+  type        = number
+  default     = 7
+  description = "Number of days to retain CloudWatch logs"
 }
 
+# ==============================================================================
+# MESSAGING SERVICES (SNS/SQS) CONFIGURATION
+# ==============================================================================
+
+variable "sns_topic_name" {
+  description = "Name of the SNS topic used for ticket events"
+  type        = string
+  default     = "ticket.exchange.fifo"
+}
+
+variable "sqs_queue_name" {
+  description = "Name of the SQS queue subscribed to the ticket topic"
+  type        = string
+  default     = "ticket-sql"
+}
+
+variable "sqs_visibility_timeout_seconds" {
+  description = "Visibility timeout for the ticket processing SQS queue"
+  type        = number
+  default     = 30
+}
+
+variable "sqs_message_retention_seconds" {
+  description = "Message retention period for the ticket processing SQS queue"
+  type        = number
+  default     = 345600  # 4 days
+}
+
+variable "sqs_receive_wait_time_seconds" {
+  description = "Long polling wait time for the ticket processing SQS queue"
+  type        = number
+  default     = 20
+}
+
+# ==============================================================================
+# NETWORKING & SECURITY
+# ==============================================================================
+
 variable "allowed_ingress_cidrs" {
-  description = "CIDR blocks allowed to access the services (security group ingress)."
+  description = "CIDR blocks allowed to access the services (security group ingress)"
   type        = list(string)
   default     = ["0.0.0.0/0"]
 }
 
+# ==============================================================================
+# APPLICATION SERVICES CONFIGURATION
+# ==============================================================================
+
 variable "app_services" {
-  description = "Map of application services to deploy via ECS."
+  description = "Map of application services to deploy via ECS"
   type = map(object({
     repository_name = string
     container_port  = number
@@ -85,7 +143,7 @@ variable "app_services" {
 }
 
 variable "service_image_tags" {
-  description = "Override map for image tags (e.g., set via CI to the latest Git SHA)."
+  description = "Override map for image tags (e.g., set via CI to the latest Git SHA)"
   type        = map(string)
   default     = {}
 }
