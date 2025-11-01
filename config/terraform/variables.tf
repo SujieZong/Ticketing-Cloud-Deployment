@@ -62,7 +62,7 @@ variable "log_retention_days" {
 variable "sns_topic_name" {
   description = "Name of the SNS topic used for ticket events"
   type        = string
-  default     = "ticket.exchange.fifo"
+  default     = "ticket-events"
 }
 
 variable "sqs_queue_name" {

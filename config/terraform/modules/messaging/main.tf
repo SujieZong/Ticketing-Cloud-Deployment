@@ -46,9 +46,10 @@ resource "aws_sqs_queue_policy" "order_queue_policy" {
 
 # SNS Topic Subscription to SQS Queue
 resource "aws_sns_topic_subscription" "order_events_sqs" {
-  topic_arn = aws_sns_topic.order_events.arn
-  protocol  = "sqs"
-  endpoint  = aws_sqs_queue.order_queue.arn
+  topic_arn            = aws_sns_topic.order_events.arn
+  protocol             = "sqs"
+  endpoint             = aws_sqs_queue.order_queue.arn
+  raw_message_delivery = true
 }
 
 # IAM Policy for ECS tasks to access SNS and SQS
