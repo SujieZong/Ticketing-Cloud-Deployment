@@ -63,6 +63,7 @@ resource "docker_image" "app" {
   build {
     context    = "${path.root}/../../${local.service_directory_map[each.key]}"
     dockerfile = "Dockerfile"
+    platform   = "linux/amd64"  
   }
 
   depends_on = [module.ecr]

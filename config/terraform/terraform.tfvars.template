@@ -1,0 +1,75 @@
+# ==============================================================================
+# AWS Learner Lab
+# ==============================================================================
+aws_access_key_id     = "YOUR_AWS_ACCESS_KEY_ID"
+aws_secret_access_key = "YOUR_AWS_SECRET_ACCESS_KEY"
+aws_session_token     = "YOUR_AWS_SESSION_TOKEN"
+
+aws_region         = "us-west-2"
+aws_account_id     = "YOUR_AWS_ACCOUNT_ID"
+log_retention_days = 3
+
+execution_role_arn = "arn:aws:iam::YOUR_AWS_ACCOUNT_ID:role/LabRole"
+task_role_arn      = "arn:aws:iam::YOUR_AWS_ACCOUNT_ID:role/LabRole"
+
+# Restrict access to your IP by setting
+allowed_ingress_cidrs = ["YOUR_IP_ADDRESS/32"]
+
+
+app_services = {
+  purchase-service = {
+    repository_name = "purchase-service"
+    container_port  = 8080
+    cpu             = "1024"
+    memory          = "2048"
+    desired_count   = 1
+    image_tag       = "latest"
+  }
+
+  query-service = {
+    repository_name = "query-service"
+    container_port  = 8080
+    cpu             = "1024"
+    memory          = "2048"
+    desired_count   = 1
+    image_tag       = "latest"
+  }
+
+  mq-projection-service = {
+    repository_name = "mq-projection-service"
+    container_port  = 8080
+    cpu             = "512"
+    memory          = "1024"
+    desired_count   = 1
+    image_tag       = "latest"
+  }
+}
+
+# ==============================================================================
+# RDS 
+# ==============================================================================
+rds_username               = "admin"
+rds_database_name          = "ticketing"
+rds_instances              = 2                             # 1 writer + 1 reader
+rds_instance_class         = "db.t4g.medium"
+rds_backup_retention_days  = 7
+rds_engine_version         = "8.0.mysql_aurora.3.05.2"     # version number
+rds_publicly_accessible    = false
+
+# ==============================================================================
+# ElastiCache Redis
+# ==============================================================================
+elasticache_engine_version           = "7.1"
+elasticache_node_type                = "cache.t3.small"
+elasticache_port                     = 6379
+elasticache_num_nodes                = 1
+elasticache_snapshot_retention_limit = 0
+
+# ==============================================================================
+# SNS/SQS 
+# ==============================================================================
+sns_topic_name                 = "ticket-events"
+sqs_queue_name                 = "ticket-sql"
+sqs_visibility_timeout_seconds = 30
+sqs_message_retention_seconds  = 345600  # 4 days
+sqs_receive_wait_time_seconds  = 20

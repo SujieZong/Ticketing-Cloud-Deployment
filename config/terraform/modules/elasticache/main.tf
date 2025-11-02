@@ -30,7 +30,7 @@ resource "aws_security_group" "redis_sg" {
 resource "random_password" "auth" {
   length           = 32
   special          = true
-  override_special = "!#$%&*()-_=+[]{}<>?:"
+  override_special = "!&#$^<>-"
 }
 
 # Store Redis password in Secrets Manager
