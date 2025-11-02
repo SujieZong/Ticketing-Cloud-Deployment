@@ -88,17 +88,26 @@ module "ecs" {
   cpu                            = each.value.cpu
   memory                         = each.value.memory
   target_group_arn               = module.alb[each.key].target_group_arn
+  sns_topic_arn                  = module.messaging.sns_topic_arn
+  sqs_queue_name                 = var.sqs_queue_name
   enable_autoscaling             = true
   autoscaling_min_capacity       = local.ecs_autoscaling_configs[each.key].min_capacity
   autoscaling_max_capacity       = local.ecs_autoscaling_configs[each.key].max_capacity
   autoscaling_target_cpu         = local.ecs_autoscaling_configs[each.key].cpu_target_value
   autoscaling_scale_in_cooldown  = local.ecs_autoscaling_configs[each.key].scale_in_cooldown
   autoscaling_scale_out_cooldown = local.ecs_autoscaling_configs[each.key].scale_out_cooldown
-}
 
-# ==============================================================================
-# Messaging Module - Shared SNS topic and SQS queue for ticket events
-# ==============================================================================
+  # Database configuration
+  db_endpoint  = module.rds.cluster_endpoint
+  db_port      = 3306
+  db_username  = var.rds_username
+  db_password  = ""  # Not used when db_secret_arn is provided
+  db_secret_arn = module.rds.secret_arn
+
+  # Redis configuration
+  redis_endpoint = module.elasticache.redis_endpoint
+  redis_port     = module.elasticache.redis_port
+}
 module "messaging" {
   source                     = "./modules/messaging"
   service_name               = "ticketing-message"
@@ -123,4 +132,19 @@ module "rds" {
   backup_retention_days  = var.rds_backup_retention_days
   engine_version         = var.rds_engine_version
   publicly_accessible    = var.rds_publicly_accessible
+}
+
+# ==============================================================================
+# Elasticache Module - Redis cluster for caching
+# ==============================================================================
+module "elasticache" {
+  source                   = "./modules/elasticache"
+  name                     = "ticketing"
+  vpc_id                   = module.network["purchase-service"].vpc_id
+  subnet_ids               = module.network["purchase-service"].subnet_ids
+  ecs_security_group_ids   = [module.network["purchase-service"].ecs_security_group_id]
+  engine_version           = var.elasticache_engine_version
+  node_type                = var.elasticache_node_type
+  port                     = var.elasticache_port
+  snapshot_retention_limit = var.elasticache_snapshot_retention_limit
 }

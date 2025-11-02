@@ -27,3 +27,13 @@ output "sqs_queue_url" {
   description = "URL of the SQS queue for ticket processing"
   value       = module.messaging.sqs_queue_url
 }
+
+output "redis_endpoint" {
+  description = "Redis cluster endpoint"
+  value       = module.elasticache.redis_endpoint
+}
+
+output "redis_port" {
+  description = "Redis cluster port"
+  value       = module.elasticache.redis_port
+}

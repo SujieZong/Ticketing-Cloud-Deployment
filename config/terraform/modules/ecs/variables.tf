@@ -97,6 +97,12 @@ variable "sqs_queue_url" {
   description = "URL of SQS queue for consuming messages"
 }
 
+variable "sqs_queue_name" {
+  type        = string
+  default     = ""
+  description = "Name of SQS queue for consuming messages"
+}
+
 # Auto Scaling Configuration
 variable "enable_autoscaling" {
   type        = bool
@@ -132,4 +138,43 @@ variable "autoscaling_scale_out_cooldown" {
   type        = number
   default     = 300
   description = "Scale-out cooldown in seconds"
+}
+
+# Database Configuration
+variable "db_endpoint" {
+  type        = string
+  description = "Database endpoint/host"
+}
+
+variable "db_port" {
+  type        = number
+  description = "Database port"
+}
+
+variable "db_username" {
+  type        = string
+  description = "Database username"
+}
+
+variable "db_password" {
+  type        = string
+  description = "Database password"
+  sensitive   = true
+}
+
+variable "db_secret_arn" {
+  type        = string
+  description = "Secrets Manager ARN that contains {username,password}"
+  sensitive   = true
+}
+
+# Redis Configuration
+variable "redis_endpoint" {
+  type        = string
+  description = "Redis endpoint/host"
+}
+
+variable "redis_port" {
+  type        = number
+  description = "Redis port"
 }

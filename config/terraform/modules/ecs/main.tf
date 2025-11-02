@@ -23,6 +23,48 @@ resource "aws_ecs_task_definition" "this" {
       containerPort = var.container_port
     }]
 
+    environment = [
+      {
+        name  = "SPRING_DATA_REDIS_HOST"
+        value = var.redis_endpoint
+      },
+      {
+        name  = "SPRING_DATA_REDIS_PORT"
+        value = tostring(var.redis_port)
+      },
+      {
+        name  = "DB_HOST"
+        value = var.db_endpoint
+      },
+      {
+        name  = "DB_PORT"
+        value = tostring(var.db_port)
+      },
+      {
+        name  = "SNS_TOPIC_ARN"
+        value = var.sns_topic_arn
+      },
+      {
+        name  = "TICKETS_BOOTSTRAP_VENUE_REDIS"
+        value = "true"
+      },
+      {
+        name  = "SQS_QUEUE_NAME"
+        value = var.sqs_queue_name
+      }
+    ]
+
+    secrets = [
+      {
+        name      = "DB_USER"
+        valueFrom = "${var.db_secret_arn}:username::"
+      },
+      {
+        name      = "DB_PASS"
+        valueFrom = "${var.db_secret_arn}:password::"
+      }
+    ]
+
     logConfiguration = {
       logDriver = "awslogs"
       options = {
