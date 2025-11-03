@@ -27,7 +27,7 @@ locals {
 # ==============================================================================
 module "network" {
   source         = "./modules/network"
-  service_name   = "ticketing"  # Shared network for all services
+  service_name   = "ticketing" # Shared network for all services
   container_port = var.container_port
   alb_port       = var.alb_port
   rds_port       = var.rds_port
@@ -101,13 +101,18 @@ module "logging" {
 # Shared ALB Module - Single Application Load Balancer for all services
 # ==============================================================================
 module "shared_alb" {
-  source                = "./modules/alb"
-  project_name          = "ticketing"
-  services              = local.app_services
-  vpc_id                = module.network.vpc_id
-  subnet_ids            = module.network.subnet_ids
-  security_group_id     = module.network.alb_security_group_id
-  health_check_path     = "/health"
+  source            = "./modules/alb"
+  project_name      = "ticketing"
+  services          = local.app_services
+  vpc_id            = module.network.vpc_id
+  subnet_ids        = module.network.subnet_ids
+  security_group_id = module.network.alb_security_group_id
+  health_check_path = "/health"
+  service_health_check_paths = {
+    "purchase-service"      = "/purchase/health"
+    "query-service"         = "/query/health"
+    "mq-projection-service" = "/events/health"
+  }
   service_path_patterns = var.service_path_patterns
   service_http_methods  = var.service_http_methods
 }
@@ -131,8 +136,8 @@ module "ecs" {
   region             = var.aws_region
   cpu                = each.value.cpu
   memory             = each.value.memory
-  # Only attach ALB target group to HTTP services (not SQS workers)
-  target_group_arn               = each.key != "mq-projection-service" ? module.shared_alb.target_group_arns[each.key] : null
+  # Attach all services to their ALB target groups for health checks
+  target_group_arn               = module.shared_alb.target_group_arns[each.key]
   sns_topic_arn                  = module.messaging.sns_topic_arn
   sqs_queue_name                 = var.sqs_queue_name
   sqs_queue_url                  = module.messaging.sqs_queue_url

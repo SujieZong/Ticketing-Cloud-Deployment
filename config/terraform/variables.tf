@@ -311,8 +311,5 @@ variable "service_path_patterns" {
 variable "service_http_methods" {
   description = "ALB HTTP method-based routing for each service (optional, used with path patterns)"
   type        = map(list(string))
-  default = {
-    "purchase-service" = ["POST"]  # Only POST requests to /api/v1/tickets
-    "query-service"    = ["GET"]   # Only GET requests
-  }
+  default     = {}
 }

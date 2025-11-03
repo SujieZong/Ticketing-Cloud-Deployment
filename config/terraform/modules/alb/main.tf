@@ -35,7 +35,7 @@ resource "aws_lb_target_group" "services" {
 
   health_check {
     enabled             = true
-    path                = var.health_check_path
+    path                = lookup(var.service_health_check_paths, each.key, var.health_check_path)
     protocol            = "HTTP"
     port                = "traffic-port"
     interval            = 30
@@ -94,7 +94,7 @@ resource "aws_lb_listener_rule" "services" {
       values = lookup(var.service_path_patterns, each.key, ["/${each.key}*"])
     }
   }
-  
+
   # Optional: HTTP method matching
   dynamic "condition" {
     for_each = lookup(var.service_http_methods, each.key, null) != null ? [1] : []

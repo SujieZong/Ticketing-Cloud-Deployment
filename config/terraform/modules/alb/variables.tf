@@ -6,12 +6,12 @@ variable "project_name" {
 variable "services" {
   description = "Map of services with their configurations"
   type = map(object({
-    container_port = number
-    image_tag      = string
+    container_port  = number
+    image_tag       = string
     repository_name = string
-    cpu            = string
-    memory         = string
-    desired_count  = number
+    cpu             = string
+    memory          = string
+    desired_count   = number
   }))
 }
 
@@ -34,6 +34,12 @@ variable "health_check_path" {
   description = "Health check path"
   type        = string
   default     = "/health"
+}
+
+variable "service_health_check_paths" {
+  description = "Map of service names to their health check paths (overrides default)"
+  type        = map(string)
+  default     = {}
 }
 
 variable "service_path_patterns" {
