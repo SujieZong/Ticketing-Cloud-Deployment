@@ -3,45 +3,11 @@
 A high-performance ticketing system built with CQRS pattern, implementing read-write separation and event-driven architecture using AWS services.
 
 ## Table of Contents
-- [Quick Start](#quick-start)
 - [Architecture Overview](#architecture-overview)
 - [Services](#services)
 - [API Documentation](#api-documentation)
-- [Development](#development)
 - [Deployment](#deployment)
 - [Troubleshooting](#troubleshooting)
-
-## Quick Start
-
-### Prerequisites
-- **Java 21** (JDK 21 LTS)
-- **Maven 3.8+**
-- **Docker** (for local development)
-- **AWS CLI v2** (for AWS deployment)
-- **Terraform 1.6+** (for infrastructure)
-
-### Local Development Setup
-```bash
-# Clone the repository
-git clone <your-repo-url>
-cd cs6620-Rabbit-ticket
-
-# Start local infrastructure
-docker compose up -d
-
-# Build and run services
-mvn clean package -DskipTests
-mvn spring-boot:run -pl PurchaseService &
-mvn spring-boot:run -pl QueryService &
-mvn spring-boot:run -pl RabbitCombinedConsumer &
-```
-
-### Health Check
-```bash
-# Check service health
-curl http://localhost:8080/actuator/health  # Purchase Service
-curl http://localhost:8081/api/v1/health    # Query Service
-```
 
 ## Architecture Overview
 
@@ -76,298 +42,203 @@ Ticket Purchase Request → PurchaseService (Redis seat locking + SNS event publ
 
 ### Infrastructure Components
 
-| Component | Purpose | Data Type |
-|-----------|---------|-----------|
-| **MySQL (RDS)** | Primary data persistence | Structured ticket data |
-| **Redis (ElastiCache)** | Seat state caching and distributed locks | Key-value cache |
-| **AWS SNS/SQS** | Event publishing and async consumption | Event messages |
+| Component | Purpose | Configuration |
+|-----------|---------|---------------|
+| **Application Load Balancer (ALB)** | HTTP routing with path-based rules | Routes `/purchase*`, `/query*`, `/events*` to respective services |
+| **ECS Auto Scaling** | Dynamic task scaling based on CPU | purchase-service: 3-6 tasks (CPU > 60%), query/consumer: 1-3 tasks (CPU > 70%) |
+| **MySQL (RDS Aurora)** | Primary data persistence | Aurora cluster: 1 writer + 1 reader replica (db.t4g.medium) |
+| **Redis (ElastiCache)** | Seat state caching and distributed locks | Single-node cluster (cache.t3.small) |
+| **AWS SNS/SQS** | Event publishing and async consumption | SNS: ticket-events topic, SQS: ticket-sql queue |
+
+**Load Balancing**: ALB distributes traffic across ECS tasks with health checks  
+**Auto Scaling**: Purchase service maintains 3-6 tasks (scales at CPU > 60%), Query/Consumer maintain 1-3 tasks (scale at CPU > 70%)  
+**Database HA**: Aurora provides automatic failover from writer to reader replica
 
 ## Services
 
-### PurchaseService (Port 8080)
-**Core Responsibility**: Handle all write operations for ticket purchases.
-
-**Key Features**:
-- REST API for ticket purchases
-- Redis-based seat locking with Lua scripts
-- SNS event publishing for eventual consistency
-- Input validation and error handling
-
-**Architecture**:
-- **Spring Boot Web**: REST API endpoints
-- **Spring Data Redis**: Seat state management
-- **AWS Spring SNS**: Event publishing
-- **Validation**: Request parameter validation
-
-### QueryService (Port 8081)
-**Core Responsibility**: Handle all read operations for ticket queries.
-
-**Key Features**:
-- REST API for ticket information retrieval
-- Multi-dimensional query support
-- Revenue and sales analytics
-- Optimized read performance
-
-**Architecture**:
-- **Spring Boot Web**: REST API endpoints
-- **Spring Data JPA**: Data access layer
-- **MySQL Connector**: Database connectivity
-- **HikariCP**: Connection pooling
-
-### SqsConsumer
-**Core Responsibility**: Bridge between write and read sides through event consumption.
-
-**Key Features**:
-- Asynchronous event processing
-- Data projection to MySQL
-- Transactional data consistency
-- Dead letter queue handling
-
-**Architecture**:
-- **AWS Spring SQS**: Message consumption
-- **Spring Data JPA**: Database operations
-- **Spring Transactions**: Data consistency
-- **Error Handling**: Retry and dead letter mechanisms
+| Service | Port | Responsibility | Key Technologies | Main Features |
+|---------|------|----------------|------------------|---------------|
+| **PurchaseService** | 8080 | Write operations - ticket purchases | Spring Boot, Redis, SNS | Redis seat locking, SNS event publishing, Input validation |
+| **QueryService** | 8081 | Read operations - ticket queries | Spring Boot, JPA, MySQL | Multi-dimensional queries, Revenue analytics, Optimized reads |
+| **SqsConsumer** | N/A | Event consumption & data projection | Spring Boot, SQS, MySQL | Async processing, Transactional consistency, Dead letter handling |
 
 ## API Documentation
 
-### PurchaseService APIs
+**Base URL**: `http://<alb-dns-name>` (Get from: `terraform output -raw alb_dns_name`)
 
-#### POST /api/v1/tickets
-Purchase a ticket with seat locking and event publishing.
+**Complete API Reference**: See `Ticketing-System-API-Tests.postman_collection.json` for full Postman collection.
 
-**Request Body**:
-```json
-{
-  "userId": "string",
-  "venueId": "string",
-  "eventId": "string",
-  "zoneId": 1,
-  "rowLabel": "A",
-  "colLabel": "1"
-}
-```
+### Quick Reference
 
-**Response**:
-```json
-{
-  "ticketId": "string",
-  "status": "CONFIRMED",
-  "venueId": "string",
-  "eventId": "string",
-  "zoneId": 1,
-  "rowLabel": "A",
-  "colLabel": "1",
-  "price": 100.00,
-  "createdOn": "2025-11-01T10:00:00Z"
-}
-```
-
-#### GET /actuator/health
-Service health check endpoint.
-
-### QueryService APIs
-
-#### GET /api/v1/health
-Service health check.
-
-**Response**:
-```json
-{
-  "status": "UP",
-  "endpoints": [
-    "/api/v1/tickets/{id}",
-    "/api/v1/tickets",
-    "/api/v1/tickets/count/{eventId}",
-    "/api/v1/tickets/revenue/{venueId}/{eventId}"
-  ]
-}
-```
-
-#### GET /api/v1/tickets/{ticketId}
-Get ticket details by ID.
-
-**Response**:
-```json
-{
-  "ticketId": "string",
-  "userId": "string",
-  "venueId": "string",
-  "eventId": "string",
-  "zoneId": 1,
-  "rowLabel": "A",
-  "colLabel": "1",
-  "price": 100.00,
-  "status": "SOLD",
-  "createdOn": "2025-11-01T10:00:00Z"
-}
-```
-
-#### GET /api/v1/tickets
-Get all sold tickets.
-
-**Response**: Array of ticket objects.
-
-#### GET /api/v1/tickets/count/{eventId}
-Get ticket sales count for an event.
-
-**Response**:
-```json
-{
-  "eventId": "string",
-  "soldCount": 150
-}
-```
-
-#### GET /api/v1/tickets/revenue/{venueId}/{eventId}
-Get revenue for venue and event combination.
-
-**Response**:
-```json
-{
-  "venueId": "string",
-  "eventId": "string",
-  "totalRevenue": 15000.00
-}
-```
-
-## Development
-
-### Local Development Environment
+#### Purchase Service (`/purchase/*`)
 ```bash
-# Start infrastructure services
-docker compose up -d
+# Purchase a ticket
+POST /purchase/api/v1/tickets
+Body: {"venueId":"Venue1","eventId":"Event1","zoneId":1,"row":"A","column":"1"}
 
-# Build all services
-mvn clean package -DskipTests
-
-# Run individual services
-mvn spring-boot:run -pl PurchaseService
-mvn spring-boot:run -pl QueryService
-mvn spring-boot:run -pl RabbitCombinedConsumer
+# Health check
+GET /purchase/health
 ```
 
-### Testing
+#### Query Service (`/query/*`)
 ```bash
-# Run unit tests
-mvn test
+# Get all tickets
+GET /query/api/v1/tickets
 
-# Run integration tests
-mvn verify
+# Get ticket by ticket ID (UUID)
+GET /query/api/v1/tickets/{ticketId}
+# Example: GET /query/api/v1/tickets/5b15a8a4-1f84-44dd-8f3d-9ae9de6e6d1b
 
-# Run with specific profile
-mvn spring-boot:run -Dspring-boot.run.profiles=docker
+# Get ticket count for event
+GET /query/api/v1/tickets/count/{eventId}
+# Example: GET /query/api/v1/tickets/count/Event1
+
+# Get revenue for venue and event
+GET /query/api/v1/tickets/revenue/{venueId}/{eventId}
+# Example: GET /query/api/v1/tickets/revenue/Venue1/Event1
+
+# Health check
+GET /query/health
 ```
 
-### Code Structure
+#### MQ Projection Service (`/events/*`)
+```bash
+# Health check (monitoring only)
+GET /events/health
 ```
-├── PurchaseService/          # Command side - ticket purchases
-├── QueryService/            # Query side - data retrieval
-├── RabbitCombinedConsumer/  # Event consumer - data projection
-├── config/
-│   ├── terraform/          # AWS infrastructure
-│   ├── environment/        # Environment configurations
-│   └── scripts/            # Build and deploy scripts
-├── docker-compose.yml       # Local development setup
-└── pom.xml                  # Parent POM
+
+### Testing Example
+
+```bash
+# Get ALB URL
+ALB_URL=$(cd config/terraform && terraform output -raw alb_dns_name)
+
+# Purchase a ticket
+curl -X POST http://$ALB_URL/purchase/api/v1/tickets \
+  -H "Content-Type: application/json" \
+  -d '{"venueId":"Venue1","eventId":"Event1","zoneId":1,"row":"A","column":"1"}'
+
+# Query all tickets (wait 2s for async processing)
+sleep 2 && curl http://$ALB_URL/query/api/v1/tickets
 ```
 
 ## Deployment
 
-### AWS Deployment Prerequisites
-- AWS CLI configured with appropriate credentials
+### Prerequisites
+- AWS CLI v2 configured with credentials
 - Terraform 1.6+
-- Docker for image building
+- Docker Desktop
+- jq (JSON processor)
 
-### Infrastructure Deployment
+### Deployment Steps
+
+#### 1. Configure Terraform Variables
 ```bash
-# Initialize Terraform
+cd config/terraform
+cp terraform.tfvars.template terraform.tfvars
+nano terraform.tfvars  # Edit: aws_region, aws_account_id, project_name, environment
+```
+
+#### 2. Configure AWS Credentials
+```bash
+# For AWS Learner Lab users:
+aws configure set aws_access_key_id YOUR_ACCESS_KEY
+aws configure set aws_secret_access_key YOUR_SECRET_KEY
+aws configure set aws_session_token YOUR_SESSION_TOKEN
+aws configure set region us-west-2
+
+# Verify
+aws sts get-caller-identity
+```
+
+#### 3. Grant Script Permissions
+```bash
+chmod +x config/scripts/build-and-push.sh
+chmod +x config/scripts/check-infrastructure.sh
+```
+
+#### 4. Create Infrastructure
+```bash
 cd config/terraform
 terraform init
-
-# Plan deployment
-terraform plan
-
-# Apply infrastructure
-terraform apply
+terraform apply -auto-approve
 ```
 
-### Service Deployment
-```bash
-# Build and push Docker images
-./config/scripts/deploy-ecr.sh
+**Creates**: VPC, ECR (3 repos), RDS Aurora MySQL, ElastiCache Redis, SNS, SQS, ALB, ECS Fargate, Secrets Manager, CloudWatch
 
-# Deploy services to ECS
-./config/scripts/deploy-aws.sh
+** Expected Time**: ~10-15 minutes (RDS Aurora and ElastiCache initialization are the slowest)
+
+#### 5. Build & Deploy Services
+```bash
+cd config/scripts
+./build-and-push.sh
+```
+---
+
+### Deployment Flow
+```
+terraform.tfvars → aws configure → chmod +x → terraform apply → ./build-and-push.sh
 ```
 
-### Environment Configuration
-Update `config/environment/.env` with your AWS resource endpoints:
+---
 
+### Verification
 ```bash
-# Database
-SPRING_DATASOURCE_URL=jdbc:mysql://your-rds-endpoint:3306/ticket_platform
+# Wait 3-5 minutes after build-and-push.sh completes, then verify:
+./config/scripts/check-infrastructure.sh
 
-# Redis
-SPRING_DATA_REDIS_HOST=your-elasticache-endpoint
+# Check service health endpoints
+ALB_URL=$(cd config/terraform && terraform output -raw alb_dns_name)
+curl http://$ALB_URL/purchase/health
+curl http://$ALB_URL/query/health
+curl http://$ALB_URL/events/health
+```
 
-# AWS Services
-AWS_REGION=us-west-2
-AWS_ACCOUNT_ID=your-account-id
-SNS_TOPIC_ARN=arn:aws:sns:us-west-2:your-account-id:ticket.exchange.fifo
+**Note**: If health checks fail initially, wait another 2-3 minutes for containers to fully initialize.
+
+### Update Services
+```bash
+# After making code changes, rebuild and redeploy
+cd config/scripts
+./build-and-push.sh
+```
+
+**Note**: The script uses the current git commit SHA as the image tag. If you want to track changes, commit before deploying:
+```bash
+cd config/scripts && ./build-and-push.sh
+```
+
+### Cleanup
+```bash
+cd config/terraform
+terraform destroy -auto-approve
 ```
 
 ## Troubleshooting
 
 ### Common Issues
 
-#### Service Startup Failures
-**Symptoms**: Services fail to start with connection errors.
+**Service Health Check Failures**
+- Verify AWS credentials: `aws sts get-caller-identity`
+- Check CloudWatch logs for error messages
+- Ensure security groups allow ALB → ECS communication
 
-**Solutions**:
-- Check database connectivity: `mysql -h <rds-endpoint> -u <username> -p`
-- Verify Redis connection: `redis-cli -h <elasticache-endpoint> ping`
-- Check AWS credentials: `aws sts get-caller-identity`
-- Review CloudWatch logs for detailed error messages
+**Database Connection Errors**
+- Verify RDS cluster status in AWS Console
+- Check Secrets Manager for correct credentials
+- Confirm VPC and subnet configuration
 
-#### Message Processing Issues
-**Symptoms**: Messages not being consumed or processed.
+**Message Processing Issues**
+- Check SQS queue has messages: `aws sqs get-queue-attributes`
+- Review CloudWatch logs for SQS consumer errors
+- Verify SNS topic subscriptions exist
 
-**Solutions**:
-- Verify SNS topic and SQS queue exist: `aws sns list-topics`, `aws sqs list-queues`
-- Check SQS queue attributes: `aws sqs get-queue-attributes --queue-url <queue-url>`
-- Review SQS consumer logs in CloudWatch
-- Check dead letter queue for failed messages
+**Terraform Errors**
+- Run `terraform init` to update providers
+- Check IAM permissions for Terraform operations
+- Verify AWS service quotas are sufficient
 
-#### Terraform Deployment Failures
-**Symptoms**: Infrastructure creation fails.
-
-**Solutions**:
-- Verify IAM permissions for Terraform operations
-- Check VPC and subnet configurations
-- Ensure service quotas are sufficient
-- Review Terraform state and error messages
-
-### Monitoring and Logging
-- **CloudWatch Logs**: All services log to CloudWatch for centralized monitoring
-- **Health Endpoints**: Use `/actuator/health` for service health checks
-- **Metrics**: Monitor ECS service metrics and RDS/ElastiCache performance
-
-### Performance Tuning
-- **Database**: Monitor slow queries and optimize indexes
-- **Redis**: Configure appropriate cache TTL and memory limits
-- **SQS**: Adjust visibility timeout and batch processing settings
-- **ECS**: Scale services based on CPU/memory utilization
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests for new functionality
-5. Ensure all tests pass
-6. Submit a pull request
-
-## License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
+### Monitoring
+- **CloudWatch Logs**: `/ecs/{service-name}` log groups
+- **Health Checks**: `curl http://<alb>/purchase/health`
+- **Infrastructure Script**: `./config/scripts/check-infrastructure.sh`
