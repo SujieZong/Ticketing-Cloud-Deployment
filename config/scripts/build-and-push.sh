@@ -2,9 +2,9 @@
 set -eo pipefail  # Removed -u flag to allow associative array iteration
 
 # ======= AWS Credentials =======
-AWS_ACCESS_KEY_ID="ASIAU6GDWL3RIW6AQGOR"
-AWS_SECRET_ACCESS_KEY="LU/mgiqSf9jojUJ/UmfvAoYIBvJ/uWrraKU3q2+g"
-AWS_SESSION_TOKEN="IQoJb3JpZ2luX2VjEIf//////////wEaCXVzLXdlc3QtMiJGMEQCIHxsAw1yhytJTV0y+ucMiVzeTvzN2LHaisfUudbF5zxTAiB1hYh4oc+3X9h/GGs5s5FzDGpgJx8mhcLoF9kSglw4TyqzAghQEAAaDDMzOTcxMjgyNzEwNiIMPJvY9LAWaXb12dKUKpACba7XdvJBFEDxpVAB5U8+WLVd36mUyTvXz5ZZd2jQGJwItuoyTA0d+kYfw8JqfH+2GxcKZ4RoaAHnSelo9zdIEkBPze9Cah+p++o8Wb3aMcGrfVTpx5/VULks3MlitWwbNqnGSpDnd4NZNmhMMQ16/wLRYHtI2jX77wO8Y6qwwOz9jGPzGmRY2R8QXPwKqmTqlTR1iTL76YZMRwyWBg2IwuvPcRaRKj1uZnpnobSGZ9sw+UdoewnDRhFgBLqc2wfUzFuQN6hEaO5LtIH+8Cx5YYfNeaRBk+kyzWdCP2V+zgZn1AYFIPu2VJ1Kstob9xvJSADzK3tn+Ywh9li6a9itC4fIOgFpaoHeuB1+ZVWieWMwm8yfyAY6ngFRFVMNebtt2aMUbpEtLfvx2U2RAd0swVWXNUTiOzz4Rl8/DW14reGfSDtAW9glJOyXnu2tjFoC8zcUKcIMCDM57AzPQrvSXtufetHPHf7TkSRJbCyzP33IyMFs3nvcM/rgg8t02mAJssz9UBDhXm25F4I9SmsyzELlKd135OB9rcsM8jDqhnpB6MO9K31rD5a79roZeKNAFgUDGoDCqQ=="
+AWS_ACCESS_KEY_ID="ASIAU6GDWL3REGDYNDX4"
+AWS_SECRET_ACCESS_KEY="ChSEkowRp1R9EFFEujixpB/R6Yc3jK65wZwSiVPP"
+AWS_SESSION_TOKEN="IQoJb3JpZ2luX2VjEIv//////////wEaCXVzLXdlc3QtMiJHMEUCIQC24xP+IlOE3BVgGzfJjPsTJPIfTz6PIVL8ADGNHRjKIAIgcLkjv6EmQGEr+r+O6M9khwAszHs0vHYcFXb9shq+Gq4qswIIVBAAGgwzMzk3MTI4MjcxMDYiDDwdMpEYz0SB7jRp/iqQAhZAzrvxhf1JyPHBMss299cbr/aJnwBa2G/r1LZYruUutnxfSw8wdoTH1w6PCfIacDBOcq0tT8d1M+sIPJpcup1/1N6oCehbomrIzQvXaHjRO9ZhDZSXBpxyJ9HRsPIPomlTb+L1GeFu9K/OmFgESoG4M08oAhIEjvma5POXAcrCBzrPpQfsauffrcYl6O4n3nxrV28DosGWYRy280HmtK53ZGhPqASVVTaokAI2jalbJ2suBGA19AaNTTB+sJSjcK8RrrwBBVSvIQ8AcoenkuCbtpJCui6WEHZ+6twqK0Ryhn1M5L4iXj5hOc8YbHFERb3BSjJ6+1CsrgMz0U1reE3W8hujff+V0SuqgcG51zUfMO27oMgGOp0BwZmCGqDHEhqCEY+8X6i4vaWjLrReEcJtmWtqc2dTsDYTw9YIjILpJzh2D/kcnFhlLPWI1Ft65+P3lzsePhyd4gLYPLdkqYeHynZMffus09DYlsRSx9W9bPbw9qBnnIT16fk2k6AZJZu99yoIu22cYDtODnAAz9f3irVxc5Jpuy2w7q+9MPUoulhK6Wei8buZg9zuIjEjrn7XQfoCGQ=="
 
 # ======= Other Variables =======
 
@@ -23,18 +23,18 @@ export AWS_REGION
 echo "[INFO] Using hardcoded AWS credentials (Learner Lab)"
 aws sts get-caller-identity || { echo "[ERR] Invalid credentials"; exit 1; }
 
-# 检查必要工具
+# Check Essential Tools
 command -v jq >/dev/null || { echo "[ERR] jq not found (brew install jq)"; exit 1; }
 
-# 读取 Terraform 输出中的 ECR 仓库信息
+# Get ECR info from Terraform Output
 echo "[INFO] Reading ECR repo URLs from Terraform outputs..."
 pushd "$TF_DIR" >/dev/null
-terraform init -input=false >/dev/null
+terraform init -input=false -no-color >/dev/null
 
 if ! terraform output ecr_repository_urls &>/dev/null; then
   echo "[WARN] ECR repositories not found in Terraform state."
   echo "[INFO] Running 'terraform apply' to create ECR repositories first..."
-  terraform apply -auto-approve -target=module.ecr
+  terraform apply -auto-approve -no-color -target=module.ecr
   echo "[OK] ECR repositories created. Continuing with image build..."
 fi
 
@@ -73,7 +73,7 @@ done
 
 echo "[INFO] Applying Terraform with new image tags..."
 pushd "$TF_DIR" >/dev/null
-terraform apply -auto-approve \
+terraform apply -auto-approve -no-color \
   -var="service_image_tags={
     \"purchase-service\":\"$TAG\",
     \"query-service\":\"$TAG\",

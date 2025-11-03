@@ -46,6 +46,35 @@ app_services = {
 }
 
 # ==============================================================================
+# ECS Auto Scaling Configuration
+# ==============================================================================
+ecs_autoscaling_overrides = {
+  "purchase-service" = {
+    min_capacity       = 1
+    max_capacity       = 6
+    cpu_target_value   = 60
+    scale_in_cooldown  = 120
+    scale_out_cooldown = 60
+  }
+
+  "query-service" = {
+    min_capacity       = 1
+    max_capacity       = 3
+    cpu_target_value   = 70
+    scale_in_cooldown  = 300
+    scale_out_cooldown = 300
+  }
+
+  "mq-projection-service" = {
+    min_capacity       = 1
+    max_capacity       = 3
+    cpu_target_value   = 70
+    scale_in_cooldown  = 300
+    scale_out_cooldown = 300
+  }
+}
+
+# ==============================================================================
 # RDS 
 # ==============================================================================
 rds_username               = "admin"
