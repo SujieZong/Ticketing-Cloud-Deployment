@@ -105,7 +105,7 @@ class TicketPurchaseServiceTest {
 
 		var req = new TicketPurchaseRequestDTO("V1", "E1", 1, "A", "7");
 
-		doThrow(new RuntimeException("RabbitMQ down")).when(messagePublisher).publishTicketCreated(any());
+		doThrow(new RuntimeException("SNS down")).when(messagePublisher).publishTicketCreated(any());
 
 		assertThatThrownBy(() -> svc.purchaseTicket(req))
 				.isInstanceOf(CreateTicketException.class);

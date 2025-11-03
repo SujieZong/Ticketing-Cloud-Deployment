@@ -1,24 +1,44 @@
-# common setting
+# AWS deployment configuration
 spring:
   application:
     name: PurchaseService
   main:
     web-application-type: servlet
-  docker:
-    compose:
-      enabled: false
+  profiles:
+    active: aws
 
-  rabbitmq:
-    host: ${SPRING_RABBITMQ_HOST}
-    port: ${SPRING_RABBITMQ_PORT:5672}
-    username: ${SPRING_RABBITMQ_USERNAME}
-    password: ${SPRING_RABBITMQ_PASSWORD}
+  # Add context path for service isolation
+  mvc:
+    servlet:
+      path: /purchase
 
+  # Database configuration for AWS Aurora
+  datasource:
+    url: jdbc:mysql://${DB_HOST}:${DB_PORT:3306}/ticketing?serverTimezone=UTC&useSSL=true&requireSSL=true
+    username: ${DB_USER}
+    password: ${DB_PASS}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      minimum-idle: 10
+      maximum-pool-size: 60
+      connection-timeout: 20000
+      validation-timeout: 5000
+      idle-timeout: 300000
+      max-lifetime: 600000
+
+  jpa:
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.MySQLDialect
+
+  # Redis configuration for AWS ElastiCache
   data:
     redis:
       host: ${SPRING_DATA_REDIS_HOST}
       port: ${SPRING_DATA_REDIS_PORT:6379}
       password: ${SPRING_DATA_REDIS_PASSWORD:}
+      ssl:
+        enabled: true
       timeout: ${SPRING_DATA_REDIS_TIMEOUT:5000}
       repositories:
         enabled: false
@@ -29,16 +49,19 @@ spring:
           min-idle: ${SPRING_DATA_REDIS_POOL_MIN_IDLE:0}
           max-wait: ${SPRING_DATA_REDIS_POOL_MAX_WAIT:-1ms}
 
-
-
 logging:
   file:
     name: ./logs/purchase-service.log
   level:
     root: INFO
     org.java.purchaseservice: DEBUG
+    org.springframework.jdbc: DEBUG
+    org.springframework.data.redis: DEBUG
 
-# 启动期是否向 Redis 预热场馆/座区（本地调试可关）
 tickets:
   bootstrap:
     venue-redis: ${TICKETS_BOOTSTRAP_VENUE_REDIS:true}
+
+sns:
+  topic:
+    ticket-created-arn: ${SNS_TOPIC_ARN:}

@@ -20,7 +20,6 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Instant;
 import java.util.UUID;
 
-//Service：ticketId/createdOn，编排占座 → 写库 → 记 Outbox → 返回
 @Service
 @Slf4j
 @RequiredArgsConstructor
@@ -66,7 +65,7 @@ public class TicketPurchaseService implements TicketPurchaseServiceInterface {
 			entity.setStatus(creation.getStatus());
 			entity.setCreatedOn(now);
 
-			// -- Part 4 -- Send message to RabbitMQ directly instead of DynamoDB and Outbox
+			// -- Part 4 -- Publish message to SNS directly
 			MqDTO event = MqDTO.builder()
 					.ticketId(ticketId)
 					.venueId(dto.getVenueId())
@@ -78,9 +77,9 @@ public class TicketPurchaseService implements TicketPurchaseServiceInterface {
 					.status(creation.getStatus())
 					.build();
 
-			// Send message to RabbitMQ for CQRS processing
+			// Publish message to SNS for downstream processing
 			ticketMessagePublisher.publishTicketCreated(event);
-			log.info("Message published to RabbitMQ for ticketId={}", ticketId);
+			log.info("Message published to SNS for ticketId={}", ticketId);
 
 			// direct return
 			return ticketMapper.toRespondDto(entity);

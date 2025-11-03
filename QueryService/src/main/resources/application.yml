@@ -1,24 +1,56 @@
-# common setting
-
+# AWS deployment configuration
 spring:
   application:
     name: QueryService
   main:
     web-application-type: servlet
+  profiles:
+    active: aws
+
+  # Add context path for service isolation
+  mvc:
+    servlet:
+      path: /query
+
   jpa:
     open-in-view: false
     hibernate:
       ddl-auto: none
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.MySQLDialect
 
+  # Database configuration for AWS Aurora
   datasource:
-    url: ${SPRING_DATASOURCE_URL}
-    username: ${SPRING_DATASOURCE_USERNAME}
-    password: ${SPRING_DATASOURCE_PASSWORD}
+    url: jdbc:mysql://${DB_HOST}:${DB_PORT:3306}/ticketing?serverTimezone=UTC&useSSL=true&requireSSL=true
+    username: ${DB_USER}
+    password: ${DB_PASS}
     driver-class-name: com.mysql.cj.jdbc.Driver
     hikari:
-      minimum-idle: ${SPRING_DATASOURCE_HIKARI_MINIMUM_IDLE:5}
-      maximum-pool-size: ${SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE:20}
-      connection-timeout: ${SPRING_DATASOURCE_HIKARI_CONNECTION_TIMEOUT:30000}
+      minimum-idle: 10
+      maximum-pool-size: 60
+      connection-timeout: 20000
+      validation-timeout: 5000
+      idle-timeout: 300000
+      max-lifetime: 600000
+
+  # Redis configuration for AWS ElastiCache
+  data:
+    redis:
+      host: ${SPRING_DATA_REDIS_HOST}
+      port: ${SPRING_DATA_REDIS_PORT:6379}
+      password: ${SPRING_DATA_REDIS_PASSWORD:}
+      ssl:
+        enabled: true
+      timeout: ${SPRING_DATA_REDIS_TIMEOUT:5000}
+      repositories:
+        enabled: false
+      lettuce:
+        pool:
+          max-active: ${SPRING_DATA_REDIS_POOL_MAX_ACTIVE:8}
+          max-idle: ${SPRING_DATA_REDIS_POOL_MAX_IDLE:8}
+          min-idle: ${SPRING_DATA_REDIS_POOL_MIN_IDLE:0}
+          max-wait: ${SPRING_DATA_REDIS_POOL_MAX_WAIT:-1ms}
 
 logging:
   file:
@@ -26,3 +58,5 @@ logging:
   level:
     root: INFO
     org.java.queryservice: DEBUG
+    org.springframework.jdbc: DEBUG
+    org.springframework.data.redis: DEBUG

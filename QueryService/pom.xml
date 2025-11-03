@@ -57,12 +57,6 @@
 			<scope>runtime</scope>
 		</dependency>
 
-		<!-- Spring Boot AMQP starter for direct RabbitMQ integration -->
-		<dependency>
-			<groupId>org.springframework.boot</groupId>
-			<artifactId>spring-boot-starter-amqp</artifactId>
-		</dependency>
-
 		<!--mapper Support-->
 		<!-- https://mvnrepository.com/artifact/org.mapstruct/mapstruct -->
 		<dependency>
@@ -114,11 +108,6 @@
 			<groupId>org.springframework.restdocs</groupId>
 			<artifactId>spring-restdocs-mockmvc</artifactId>
 			<scope>test</scope>
-		</dependency>
-
-		<dependency>
-			<groupId>org.springframework</groupId>
-			<artifactId>spring-messaging</artifactId>
 		</dependency>
 	</dependencies>
 

@@ -1,40 +1,63 @@
-# common setting
+# AWS deployment configuration
 spring:
   application:
     name: TicketingConsumer
-
   main:
-    web-application-type: none
+    web-application-type: servlet  # Health check
+  profiles:
+    active: aws
+
+  # Add context path for service isolation
+  mvc:
+    servlet:
+      path: /events
+
   docker:
     compose:
       enabled: false
 
-  rabbitmq:
-    host: ${SPRING_RABBITMQ_HOST}
-    port: ${SPRING_RABBITMQ_PORT:5672}
-    username: ${SPRING_RABBITMQ_USERNAME}
-    password: ${SPRING_RABBITMQ_PASSWORD}
-
+  # Database configuration for AWS Aurora
   datasource:
-    url: ${SPRING_DATASOURCE_URL}
-    username: ${SPRING_DATASOURCE_USERNAME}
-    password: ${SPRING_DATASOURCE_PASSWORD}
+    url: jdbc:mysql://${DB_HOST}:${DB_PORT:3306}/ticketing?serverTimezone=UTC&useSSL=true&requireSSL=true
+    username: ${DB_USER}
+    password: ${DB_PASS}
     driver-class-name: com.mysql.cj.jdbc.Driver
     hikari:
-      minimum-idle: ${SPRING_DATASOURCE_HIKARI_MINIMUM_IDLE:5}
-      maximum-pool-size: ${SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE:20}
-      connection-timeout: ${SPRING_DATASOURCE_HIKARI_CONNECTION_TIMEOUT:30000}
+      minimum-idle: 10
+      maximum-pool-size: 60
+      connection-timeout: 20000
+      validation-timeout: 5000
+      idle-timeout: 300000
+      max-lifetime: 600000
 
   jpa:
     hibernate:
-      ddl-auto: validate 
-    show-sql: true 
+      ddl-auto: validate
+    show-sql: true
     defer-datasource-initialization: true
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.MySQLDialect
   sql:
     init:
       mode: always
       continue-on-error: true
       separator: ";"
+
+cloud:
+  aws:
+    region:
+      static: ${AWS_REGION:us-west-2}
+    credentials:
+      access-key: ${AWS_ACCESS_KEY_ID:dummy}
+      secret-key: ${AWS_SECRET_ACCESS_KEY:dummy}
+    endpoint:
+      sqs: ${AWS_SQS_ENDPOINT:}
+
+sqs:
+  queue:
+    ticket-sql-name: ${SQS_QUEUE_NAME:ticket-sql}
+    ticket-sql-url: ${SQS_QUEUE_URL:}
 
 logging:
   file:
@@ -42,6 +65,6 @@ logging:
   level:
     root: INFO
     org.java.rabbitcombinedconsumer: DEBUG
-    org.springframework.jdbc.datasource.init: DEBUG 
-    org.springframework.boot.sql.init: DEBUG 
+    org.springframework.jdbc.datasource.init: DEBUG
+    org.springframework.boot.sql.init: DEBUG
     org.springframework.jdbc: DEBUG 

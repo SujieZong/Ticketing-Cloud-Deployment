@@ -18,10 +18,11 @@
     <properties>
         <java.version>21</java.version>
         <spring.boot.version>3.5.5</spring.boot.version>
-        <spring.cloud.version>2025.0.0</spring.cloud.version>
+        <spring.cloud.version>2024.0.0</spring.cloud.version>
         <mapstruct.version>1.5.5.Final</mapstruct.version>
         <lombok.version>1.18.36</lombok.version>
         <rabbit.version>5.26.0</rabbit.version>
+        <awspring.version>3.1.0</awspring.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     </properties>
 
@@ -41,6 +42,15 @@
                 <groupId>org.springframework.cloud</groupId>
                 <artifactId>spring-cloud-dependencies</artifactId>
                 <version>${spring.cloud.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+
+            <!-- AWSpring BOM -->
+            <dependency>
+                <groupId>io.awspring.cloud</groupId>
+                <artifactId>spring-cloud-aws-dependencies</artifactId>
+                <version>${awspring.version}</version>
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>
