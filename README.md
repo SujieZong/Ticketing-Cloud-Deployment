@@ -11,6 +11,7 @@ A high-performance ticketing system built with CQRS pattern, implementing read-w
 
 ## Architecture Overview
 
+
 ### CQRS Pattern Implementation
 This system implements Command Query Responsibility Segregation (CQRS) with event-driven architecture:
 
