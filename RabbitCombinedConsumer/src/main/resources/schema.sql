@@ -1,9 +1,9 @@
 -- mysql -u root -p < schema.sql
 
-CREATE DATABASE IF NOT EXISTS ticket_platform
+CREATE DATABASE IF NOT EXISTS ticketing
     CHARACTER SET utf8mb4
     COLLATE utf8mb4_unicode_ci;
-USE ticket_platform;
+USE ticketing;
 
 -- 1. 场馆表（Venue）
 CREATE TABLE venue (

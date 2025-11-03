@@ -37,3 +37,6 @@ config/terraform/.terraform/
 config/terraform/.terraform.lock.hcl
 *.tfstate
 *.tfstate.backup
+config/terraform/terraform.tfvars
+config/scripts/build-and-push.sh
+config/terraform/terraform.tfstate.1762057262.backup
