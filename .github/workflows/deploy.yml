@@ -17,7 +17,7 @@ env:
   TF_VERSION: 1.6.0
 
 jobs:
-  # Job 1: Build Services 
+  # Job 1: Build Services
   build:
     name: Build Java Services
     runs-on: ubuntu-latest
