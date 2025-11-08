@@ -130,6 +130,8 @@ sleep 2 && curl http://$ALB_URL/query/api/v1/tickets
 
 ## Deployment
 
+> 🎓 **Using AWS Learner Lab?** See [AWS-LEARNER-LAB-GUIDE.md](AWS-LEARNER-LAB-GUIDE.md) for special instructions!
+
 ### Prerequisites
 
 - AWS CLI v2 configured with credentials
@@ -139,14 +141,31 @@ sleep 2 && curl http://$ALB_URL/query/api/v1/tickets
 
 ### Deployment Options
 
-You can deploy this system in two ways:
+You can deploy this system in multiple ways:
 
-1. **Local Deployment** (Recommended for AWS Learner Lab): Using terminal commands
-2. **CI/CD Pipeline** (Optional): Using GitHub Actions for automated deployment
+1. **GitHub Actions CI/CD** (Recommended): Automated deployment with 5 workflow options
+2. **Local Deployment**: Using terminal commands for testing
+
+#### GitHub Actions Workflows
+
+| Workflow                      | Purpose            | Use Case                     |
+| ----------------------------- | ------------------ | ---------------------------- |
+| 🚀 **full-deployment**        | Deploy everything  | Fresh start, complete setup  |
+| 🏗️ **infrastructure-only**    | AWS resources only | Test infra changes           |
+| 🐳 **services-only**          | Update containers  | Code changes, quick updates  |
+| 🗑️ **destroy-infrastructure** | Clean shutdown     | Proper resource cleanup      |
+| 🧹 **force-cleanup**          | Nuclear cleanup    | When state is lost/corrupted |
+
+**Smart State Management:**
+
+- ✅ State saved AFTER successful deployment (for destroy)
+- ✅ State restored ONLY for destroy operations
+- ✅ Fresh deployments bypass cache (avoid conflicts)
+- ✅ Auto-fallback to cleanup script if state missing
 
 ---
 
-## Local Deployment (Recommended)
+## Local Deployment (For Testing)
 
 ### Deployment Steps
 
@@ -306,7 +325,7 @@ git push origin main
 2. Click the "Actions" tab at the top of the page
 ```
 
-**Step 2: Select Workflow** 
+**Step 2: Select Workflow**
 
 ```
 3. In the left sidebar, click "Deploy Ticketing System"

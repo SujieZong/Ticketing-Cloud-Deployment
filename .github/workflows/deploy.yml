@@ -12,6 +12,7 @@ on:
           - "services-only"
           - "full-deployment"
           - "destroy-infrastructure"
+          - "force-cleanup"
 
 env:
   AWS_REGION: us-west-2
@@ -70,7 +71,42 @@ jobs:
             RabbitCombinedConsumer/target/*.jar
           retention-days: 1
 
-  # Job 2: Terraform Infrastructure (OPTIONAL)
+  # Job 2: Force Cleanup (No Terraform State Required)
+  force-cleanup:
+    name: Force Cleanup AWS Resources
+    runs-on: ubuntu-latest
+    if: github.event.inputs.action == 'force-cleanup'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Run Cleanup Script
+        run: |
+          echo "🧹 Running force cleanup (no Terraform state needed)..."
+          chmod +x ./config/scripts/cleanup-aws-resources.sh
+          ./config/scripts/cleanup-aws-resources.sh
+
+      - name: Cleanup Summary
+        run: |
+          echo "### 🧹 Force Cleanup Complete!" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "All AWS resources have been deleted using the cleanup script." >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Next Steps:**" >> $GITHUB_STEP_SUMMARY
+          echo "1. Clear GitHub Actions cache: https://github.com/${{ github.repository }}/actions/caches" >> $GITHUB_STEP_SUMMARY
+          echo "2. Wait 2-3 minutes for AWS to fully process deletions" >> $GITHUB_STEP_SUMMARY
+          echo "3. Run 'full-deployment' to deploy fresh infrastructure" >> $GITHUB_STEP_SUMMARY
+
+  # Job 3: Terraform Infrastructure
   terraform-infrastructure:
     name: Deploy Infrastructure with Terraform
     runs-on: ubuntu-latest
@@ -84,6 +120,12 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
+      - name: Clear stale caches (for AWS Learner Lab)
+        continue-on-error: true
+        run: |
+          echo "🧹 Note: Clear GitHub Actions caches manually if you see 'resource already exists' errors"
+          echo "Go to: https://github.com/${{ github.repository }}/actions/caches"
 
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -99,16 +141,19 @@ jobs:
           terraform_version: ${{ env.TF_VERSION }}
           terraform_wrapper: false
 
-      # Cache Terraform state
-      - name: Cache Terraform state
-        uses: actions/cache@v3
+      # Restore Terraform state for destroy operations only
+      - name: Restore Terraform State
+        if: github.event.inputs.action == 'destroy-infrastructure'
+        uses: actions/cache/restore@v3
         with:
           path: |
             config/terraform/terraform.tfstate
             config/terraform/terraform.tfstate.backup
             config/terraform/.terraform
-          key: terraform-state-${{ github.sha }}
-          restore-keys: terraform-state-
+          key: terraform-state-${{ github.ref_name }}
+          restore-keys: |
+            terraform-state-${{ github.ref_name }}
+            terraform-state-
 
       - name: Create terraform.tfvars
         working-directory: ./config/terraform
@@ -132,10 +177,40 @@ jobs:
         run: terraform apply -auto-approve
         if: github.event.inputs.action != 'destroy-infrastructure'
 
+      # Save state AFTER successful apply for future destroy operations
+      - name: Save Terraform State
+        if: github.event.inputs.action != 'destroy-infrastructure' && success()
+        uses: actions/cache/save@v3
+        with:
+          path: |
+            config/terraform/terraform.tfstate
+            config/terraform/terraform.tfstate.backup
+            config/terraform/.terraform
+          key: terraform-state-${{ github.ref_name }}-${{ github.run_number }}
+
       - name: Terraform Destroy
+        id: tf-destroy
         working-directory: ./config/terraform
+        continue-on-error: true
         run: terraform destroy -auto-approve
         if: github.event.inputs.action == 'destroy-infrastructure'
+
+      # Fallback: Use cleanup script if Terraform destroy fails (no state available)
+      - name: Fallback - Manual Cleanup
+        if: github.event.inputs.action == 'destroy-infrastructure' && steps.tf-destroy.outcome == 'failure'
+        run: |
+          echo "⚠️ Terraform destroy failed (likely no state found)"
+          echo "🧹 Running manual cleanup script instead..."
+          chmod +x ./config/scripts/cleanup-aws-resources.sh
+          ./config/scripts/cleanup-aws-resources.sh
+
+      # Delete state cache after destroy
+      - name: Clear State Cache After Destroy
+        if: github.event.inputs.action == 'destroy-infrastructure' && success()
+        continue-on-error: true
+        run: |
+          echo "✅ Resources destroyed. State cache will expire naturally."
+          echo "🧹 To clear cache manually: https://github.com/${{ github.repository }}/actions/caches"
 
       - name: Export Infrastructure Outputs
         id: tf-outputs
@@ -167,7 +242,7 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Next Step:** Run 'full-deployment' to recreate infrastructure" >> $GITHUB_STEP_SUMMARY
 
-  # Job 3: Deploy Services
+  # Job 4: Deploy Services
   deploy-services:
     name: Build & Deploy Docker Services
     runs-on: ubuntu-latest
