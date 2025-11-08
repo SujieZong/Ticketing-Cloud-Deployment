@@ -306,7 +306,7 @@ git push origin main
 2. Click the "Actions" tab at the top of the page
 ```
 
-**Step 2: Select Workflow**
+**Step 2: Select Workflow** 
 
 ```
 3. In the left sidebar, click "Deploy Ticketing System"
