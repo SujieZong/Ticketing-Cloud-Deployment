@@ -241,13 +241,13 @@ jobs:
           # Import Security Groups
           ALB_SG=$(aws ec2 describe-security-groups --region $REGION --filters "Name=group-name,Values=ticketing-alb-sg" --query "SecurityGroups[0].GroupId" --output text 2>/dev/null || echo "")
           [ ! -z "$ALB_SG" ] && [ "$ALB_SG" != "None" ] && terraform import 'module.network.aws_security_group.alb_sg' "$ALB_SG" 2>/dev/null || true
-          
+
           ECS_SG=$(aws ec2 describe-security-groups --region $REGION --filters "Name=group-name,Values=ticketing-ecs-sg" --query "SecurityGroups[0].GroupId" --output text 2>/dev/null || echo "")
           [ ! -z "$ECS_SG" ] && [ "$ECS_SG" != "None" ] && terraform import 'module.network.aws_security_group.this' "$ECS_SG" 2>/dev/null || true
-          
+
           RDS_SG=$(aws ec2 describe-security-groups --region $REGION --filters "Name=group-name,Values=ticketing-rds-sg" --query "SecurityGroups[0].GroupId" --output text 2>/dev/null || echo "")
           [ ! -z "$RDS_SG" ] && [ "$RDS_SG" != "None" ] && terraform import 'module.network.aws_security_group.rds_sg' "$RDS_SG" 2>/dev/null || true
-          
+
           REDIS_SG=$(aws ec2 describe-security-groups --region $REGION --filters "Name=group-name,Values=ticketing-redis-sg" --query "SecurityGroups[0].GroupId" --output text 2>/dev/null || echo "")
           [ ! -z "$REDIS_SG" ] && [ "$REDIS_SG" != "None" ] && terraform import 'module.network.aws_security_group.redis_sg' "$REDIS_SG" 2>/dev/null || true
 
@@ -311,13 +311,13 @@ jobs:
           # Security Groups (all of them)
           ALB_SG=$(aws ec2 describe-security-groups --region $REGION --filters "Name=group-name,Values=ticketing-alb-sg" --query "SecurityGroups[0].GroupId" --output text 2>/dev/null || echo "")
           [ ! -z "$ALB_SG" ] && [ "$ALB_SG" != "None" ] && terraform import 'module.network.aws_security_group.alb_sg' "$ALB_SG" 2>/dev/null || true
-          
+
           ECS_SG=$(aws ec2 describe-security-groups --region $REGION --filters "Name=group-name,Values=ticketing-ecs-sg" --query "SecurityGroups[0].GroupId" --output text 2>/dev/null || echo "")
           [ ! -z "$ECS_SG" ] && [ "$ECS_SG" != "None" ] && terraform import 'module.network.aws_security_group.this' "$ECS_SG" 2>/dev/null || true
-          
+
           RDS_SG=$(aws ec2 describe-security-groups --region $REGION --filters "Name=group-name,Values=ticketing-rds-sg" --query "SecurityGroups[0].GroupId" --output text 2>/dev/null || echo "")
           [ ! -z "$RDS_SG" ] && [ "$RDS_SG" != "None" ] && terraform import 'module.network.aws_security_group.rds_sg' "$RDS_SG" 2>/dev/null || true
-          
+
           REDIS_SG=$(aws ec2 describe-security-groups --region $REGION --filters "Name=group-name,Values=ticketing-redis-sg" --query "SecurityGroups[0].GroupId" --output text 2>/dev/null || echo "")
           [ ! -z "$REDIS_SG" ] && [ "$REDIS_SG" != "None" ] && terraform import 'module.network.aws_security_group.redis_sg' "$REDIS_SG" 2>/dev/null || true
 
