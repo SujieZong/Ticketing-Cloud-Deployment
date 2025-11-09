@@ -741,14 +741,82 @@ This CI/CD implementation showcases:
 - Review CloudWatch logs for SQS consumer errors
 - Verify SNS topic subscriptions exist
 
-**Terraform Errors**
+**Terraform Errors - "Resource Already Exists"**
 
-- Run `terraform init` to update providers
-- Check IAM permissions for Terraform operations
-- Verify AWS service quotas are sufficient
+If you see errors like:
+```
+Error: creating ECS Cluster: ResourceAlreadyExistsException
+Error: creating RDS Cluster: DBClusterAlreadyExistsFault
+Error: creating Target Group: DuplicateTargetGroupName
+```
+
+**✅ Solution**: The CI/CD pipeline now has **Auto-Import** feature!
+
+1. **First Time**: Just run the workflow again - it will automatically import existing resources
+2. **Persistent Issues**: Use the `force-cleanup` workflow action to delete all resources first
+3. **Manual Import**: Run `./config/scripts/test-imports.sh` to test import commands locally
+
+📖 See [AUTO-IMPORT-EXPLAINED.md](AUTO-IMPORT-EXPLAINED.md) for technical details.
+
+**Terraform State Issues**
+
+```bash
+# If state is corrupted or lost
+cd config/terraform
+
+# Option 1: Refresh state from AWS
+terraform refresh
+
+# Option 2: Import existing resources
+terraform import 'module.ecr.aws_ecr_repository.repos["purchase-service"]' purchase-service
+# ... (see COMPLETE-IMPORT-LIST.md for all resources)
+
+# Option 3: Clean start (⚠️ deletes everything!)
+./config/scripts/cleanup-aws-resources.sh
+```
+
+**GitHub Actions Failures**
+
+```bash
+# Check workflow logs in: GitHub → Actions → <failed-run>
+
+# Common fixes:
+1. Update AWS credentials in GitHub Secrets (they expire in Learner Lab)
+2. Wait for previous workflow to complete before running new one
+3. Use "force-cleanup" if resources are stuck in bad state
+4. Check CloudWatch Logs for application errors
+```
 
 ### Monitoring
 
 - **CloudWatch Logs**: `/ecs/{service-name}` log groups
 - **Health Checks**: `curl http://<alb>/purchase/health`
 - **Infrastructure Script**: `./config/scripts/check-infrastructure.sh`
+- **Import Test**: `./config/scripts/test-imports.sh` (test resource imports locally)
+
+### Getting Help
+
+1. **Check Logs**:
+   ```bash
+   # ECS task logs
+   aws logs tail /ecs/purchase-service --follow
+   
+   # Recent deployment errors
+   cd config/terraform && terraform show
+   ```
+
+2. **Verify Resources**:
+   ```bash
+   ./config/scripts/check-infrastructure.sh
+   ```
+
+3. **Test Imports**:
+   ```bash
+   chmod +x config/scripts/test-imports.sh
+   ./config/scripts/test-imports.sh
+   ```
+
+4. **Documentation**:
+   - [AWS Learner Lab Guide](AWS-LEARNER-LAB-GUIDE.md)
+   - [Auto-Import Documentation](AUTO-IMPORT-EXPLAINED.md)
+   - [Complete Import Resource List](COMPLETE-IMPORT-LIST.md)
