@@ -141,7 +141,7 @@ module "ecs" {
   cpu                = each.value.cpu
   memory             = each.value.memory
   # Attach all services to their ALB target groups for health checks
-  target_group_arn               = module.shared_alb.target_group_arns[each.key]
+  target_group_arn               = lookup(module.shared_alb.target_group_arns, each.key, null)
   sns_topic_arn                  = module.messaging.sns_topic_arn
   sqs_queue_name                 = var.sqs_queue_name
   sqs_queue_url                  = module.messaging.sqs_queue_url
