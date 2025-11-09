@@ -1,18 +1,22 @@
 # Workflow File Cleanup Summary
 
 ## Problem
+
 The GitHub Actions workflow dropdown was not displaying properly in the UI despite having correct `workflow_dispatch` configuration. This occurred after multiple revisions accumulated, making the file messy and difficult to maintain.
 
 ## Root Cause Analysis
+
 After analyzing the 653-line `deploy.yml` file, I identified:
 
 1. **Triple-Redundant Import Logic** (primary issue):
+
    - Proactive Import step (~80 lines) - ran before `terraform plan`
    - Handle Existing Resources step (~60 lines) - ran after plan failures
    - Handle Apply Failures step (~80 lines) - ran after apply failures
    - All three blocks performed nearly identical imports with slight variations
 
 2. **Complex Nested Conditionals**:
+
    - Multiple levels of if/else logic
    - Difficult to follow execution flow
    - Increased maintenance burden
@@ -25,6 +29,7 @@ After analyzing the 653-line `deploy.yml` file, I identified:
 ## Solution Implemented
 
 ### Cleaned Workflow Structure
+
 Reduced file from **653 lines → 217 lines** (67% reduction):
 
 ```yaml
@@ -35,7 +40,7 @@ on:
     inputs:
       action:
         type: choice
-        default: 'full-deployment'
+        default: "full-deployment"
         options:
           - full-deployment
           - infrastructure-only
@@ -44,15 +49,16 @@ on:
           - force-cleanup
 
 jobs:
-  build:              # Builds Java services
-  force-cleanup:      # Manual resource deletion
-  terraform:          # Infrastructure management (SINGLE import step)
-  deploy-services:    # Deploy to ECS
+  build: # Builds Java services
+  force-cleanup: # Manual resource deletion
+  terraform: # Infrastructure management (SINGLE import step)
+  deploy-services: # Deploy to ECS
 ```
 
 ### Key Improvements
 
 1. **Single Unified Import Step**:
+
    ```yaml
    - name: Import Resources
      if: github.event.inputs.action != 'destroy-infrastructure'
@@ -60,17 +66,19 @@ jobs:
      run: |
        # Helper function for safe imports
        imp() { terraform import "$1" "$2" 2>/dev/null && echo "✓ $1" || true; }
-       
+
        # ECR, ALB, Target Groups, Security Groups, RDS, Redis, etc.
        # All imports in ONE place
    ```
 
 2. **Simplified Job Conditionals**:
+
    - Clear, single-line conditions
    - Easy to understand when each job runs
    - Proper job dependencies with `needs:`
 
 3. **Better Organization**:
+
    - Comment headers for each job section
    - Consistent formatting
    - Logical step ordering
@@ -84,10 +92,12 @@ jobs:
 ## Changes Made
 
 ### Files Modified
+
 - `.github/workflows/deploy.yml` - Complete rewrite (217 lines)
 - `.github/workflows/deploy.yml.backup` - Original 653-line version preserved
 
 ### Commit
+
 ```
 commit c61086f
 Refactor: Clean workflow file to fix dropdown UI
@@ -102,17 +112,19 @@ Refactor: Clean workflow file to fix dropdown UI
 ## Next Steps
 
 1. **Verify in GitHub UI**:
+
    - Go to Actions tab: https://github.com/SujieZong/Ticketing-Cloud-Deployment/actions
    - Click "Deploy Ticketing System" workflow
    - Click "Run workflow" button
    - **Verify dropdown shows all 5 options properly**
 
 2. **Test a Deployment**:
+
    ```bash
    # Option 1: GitHub UI
    - Select "infrastructure-only"
    - Click "Run workflow"
-   
+
    # Option 2: GitHub CLI
    gh workflow run deploy.yml \
      -f action=infrastructure-only \
@@ -120,18 +132,19 @@ Refactor: Clean workflow file to fix dropdown UI
    ```
 
 3. **Run Terraform Destroy** :
+
    ```bash
    # Option 1: GitHub UI
    - Actions → Deploy Ticketing System
    - Run workflow
    - Select "destroy-infrastructure"
    - Click "Run workflow"
-   
+
    # Option 2: GitHub CLI
    gh workflow run deploy.yml \
      -f action=destroy-infrastructure \
      -ref SujieBranch
-   
+
    # Option 3: Force cleanup (more aggressive)
    gh workflow run deploy.yml \
      -f action=force-cleanup \
@@ -141,6 +154,7 @@ Refactor: Clean workflow file to fix dropdown UI
 ## Technical Details
 
 ### Resource Import Coverage (21 types)
+
 - ✅ ECR Repositories (3)
 - ✅ Application Load Balancer
 - ✅ Target Groups (3)
@@ -152,6 +166,7 @@ Refactor: Clean workflow file to fix dropdown UI
 - ✅ IAM Policy
 
 ### AWS Account ID Auto-Detection
+
 ```bash
 ACCT=$(aws sts get-caller-identity --query Account --output text)
 # Automatically populates terraform.tfvars with correct Account ID
@@ -159,6 +174,7 @@ ACCT=$(aws sts get-caller-identity --query Account --output text)
 ```
 
 ### State Management
+
 ```yaml
 # Save state after successful deployment
 - uses: actions/cache/save@v3
@@ -195,6 +211,7 @@ ACCT=$(aws sts get-caller-identity --query Account --output text)
 The workflow file has been completely refactored with a clean, maintainable structure. The file size was reduced by 67% by eliminating redundant import logic while preserving all functionality. The workflow_dispatch dropdown should now display properly in the GitHub Actions UI.
 
 **File Comparison**:
+
 - Old: 653 lines, 34KB, messy with triple imports
 - New: 217 lines, clean single import, easy to maintain
 - Backup: Original preserved at `deploy.yml.backup`
