@@ -744,6 +744,7 @@ This CI/CD implementation showcases:
 **Terraform Errors - "Resource Already Exists"**
 
 If you see errors like:
+
 ```
 Error: creating ECS Cluster: ResourceAlreadyExistsException
 Error: creating RDS Cluster: DBClusterAlreadyExistsFault
@@ -797,20 +798,23 @@ terraform import 'module.ecr.aws_ecr_repository.repos["purchase-service"]' purch
 ### Getting Help
 
 1. **Check Logs**:
+
    ```bash
    # ECS task logs
    aws logs tail /ecs/purchase-service --follow
-   
+
    # Recent deployment errors
    cd config/terraform && terraform show
    ```
 
 2. **Verify Resources**:
+
    ```bash
    ./config/scripts/check-infrastructure.sh
    ```
 
 3. **Test Imports**:
+
    ```bash
    chmod +x config/scripts/test-imports.sh
    ./config/scripts/test-imports.sh

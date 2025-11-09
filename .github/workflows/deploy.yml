@@ -189,19 +189,19 @@ jobs:
         run: |
           echo "🔄 Proactively checking and importing any existing resources..."
           REGION="${{ env.AWS_REGION }}"
-          
+
           # Import all resources that might exist (errors are ignored)
           # This runs BEFORE plan/apply to prevent "already exists" errors
-          
+
           # ECR
           terraform import 'module.ecr["purchase-service"].aws_ecr_repository.this' purchase-service 2>/dev/null || true
           terraform import 'module.ecr["query-service"].aws_ecr_repository.this' query-service 2>/dev/null || true
           terraform import 'module.ecr["mq-projection-service"].aws_ecr_repository.this' mq-projection-service 2>/dev/null || true
-          
+
           # ALB
           ALB_ARN=$(aws elbv2 describe-load-balancers --region $REGION --query "LoadBalancers[?LoadBalancerName=='ticketing-alb'].LoadBalancerArn" --output text 2>/dev/null || echo "")
           [ ! -z "$ALB_ARN" ] && terraform import 'module.shared_alb.aws_lb.shared' "$ALB_ARN" 2>/dev/null || true
-          
+
           # Target Groups
           TG_PURCHASE=$(aws elbv2 describe-target-groups --region $REGION --query "TargetGroups[?TargetGroupName=='purchase-service-tg'].TargetGroupArn" --output text 2>/dev/null || echo "")
           TG_QUERY=$(aws elbv2 describe-target-groups --region $REGION --query "TargetGroups[?TargetGroupName=='query-service-tg'].TargetGroupArn" --output text 2>/dev/null || echo "")
@@ -209,48 +209,48 @@ jobs:
           [ ! -z "$TG_PURCHASE" ] && terraform import 'module.shared_alb.aws_lb_target_group.services["purchase-service"]' "$TG_PURCHASE" 2>/dev/null || true
           [ ! -z "$TG_QUERY" ] && terraform import 'module.shared_alb.aws_lb_target_group.services["query-service"]' "$TG_QUERY" 2>/dev/null || true
           [ ! -z "$TG_MQ" ] && terraform import 'module.shared_alb.aws_lb_target_group.services["mq-projection-service"]' "$TG_MQ" 2>/dev/null || true
-          
+
           # Security Groups
           ALB_SG=$(aws ec2 describe-security-groups --region $REGION --filters "Name=group-name,Values=ticketing-alb-sg" --query "SecurityGroups[0].GroupId" --output text 2>/dev/null || echo "")
           [ ! -z "$ALB_SG" ] && [ "$ALB_SG" != "None" ] && terraform import 'module.network.aws_security_group.alb_sg' "$ALB_SG" 2>/dev/null || true
-          
+
           ECS_SG=$(aws ec2 describe-security-groups --region $REGION --filters "Name=group-name,Values=ticketing-ecs-sg" --query "SecurityGroups[0].GroupId" --output text 2>/dev/null || echo "")
           [ ! -z "$ECS_SG" ] && [ "$ECS_SG" != "None" ] && terraform import 'module.network.aws_security_group.this' "$ECS_SG" 2>/dev/null || true
-          
+
           RDS_SG=$(aws ec2 describe-security-groups --region $REGION --filters "Name=group-name,Values=ticketing-rds-sg" --query "SecurityGroups[0].GroupId" --output text 2>/dev/null || echo "")
           [ ! -z "$RDS_SG" ] && [ "$RDS_SG" != "None" ] && terraform import 'module.network.aws_security_group.rds_sg' "$RDS_SG" 2>/dev/null || true
-          
+
           REDIS_SG=$(aws ec2 describe-security-groups --region $REGION --filters "Name=group-name,Values=ticketing-redis-sg" --query "SecurityGroups[0].GroupId" --output text 2>/dev/null || echo "")
           [ ! -z "$REDIS_SG" ] && [ "$REDIS_SG" != "None" ] && terraform import 'module.elasticache.aws_security_group.redis_sg' "$REDIS_SG" 2>/dev/null || true
-          
+
           # RDS Cluster
           terraform import 'module.rds.aws_rds_cluster.this' ticketing-aurora 2>/dev/null || true
-          
+
           # RDS Instances (if any)
           terraform import 'module.rds.aws_rds_cluster_instance.this[0]' ticketing-aurora-instance-1 2>/dev/null || true
           terraform import 'module.rds.aws_rds_cluster_instance.this[1]' ticketing-aurora-instance-2 2>/dev/null || true
-          
+
           # CloudWatch Logs
           terraform import 'module.logging["purchase-service"].aws_cloudwatch_log_group.this' /ecs/purchase-service 2>/dev/null || true
           terraform import 'module.logging["query-service"].aws_cloudwatch_log_group.this' /ecs/query-service 2>/dev/null || true
           terraform import 'module.logging["mq-projection-service"].aws_cloudwatch_log_group.this' /ecs/mq-projection-service 2>/dev/null || true
-          
+
           # Secrets
           terraform import 'module.elasticache.aws_secretsmanager_secret.redis' ticketing-redis-credentials 2>/dev/null || true
           terraform import 'module.rds.aws_secretsmanager_secret.db' ticketing-db-credentials 2>/dev/null || true
-          
+
           # ElastiCache
           terraform import 'module.elasticache.aws_elasticache_subnet_group.this' ticketing-cache-subnet-group 2>/dev/null || true
           terraform import 'module.elasticache.aws_elasticache_parameter_group.this' ticketing-redis-params 2>/dev/null || true
-          
+
           # RDS
           terraform import 'module.rds.aws_db_subnet_group.default' ticketing-aurora-subnet-group 2>/dev/null || true
           terraform import 'module.rds.aws_rds_cluster_parameter_group.this' ticketing-mysql-params 2>/dev/null || true
-          
+
           # IAM
           POLICY_ARN=$(aws iam list-policies --query "Policies[?PolicyName=='ticketing-message-messaging-access'].Arn" --output text 2>/dev/null || echo "")
           [ ! -z "$POLICY_ARN" ] && terraform import 'module.messaging.aws_iam_policy.messaging_access' "$POLICY_ARN" 2>/dev/null || true
-          
+
           echo "✅ Proactive import complete - proceeding with plan/apply"
 
       - name: Terraform Plan
