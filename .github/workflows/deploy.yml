@@ -183,14 +183,129 @@ jobs:
         run: terraform init -upgrade
 
       - name: Terraform Plan
+        id: plan
         working-directory: ./config/terraform
+        continue-on-error: true
         run: terraform plan -no-color
         if: github.event.inputs.action != 'destroy-infrastructure'
 
-      - name: Terraform Apply
+      - name: Handle Existing Resources (Auto-Import)
+        if: github.event.inputs.action != 'destroy-infrastructure' && steps.plan.outcome == 'failure'
         working-directory: ./config/terraform
+        run: |
+          echo "⚠️ Plan failed - likely due to existing resources"
+          echo "🔄 Attempting to import existing resources..."
+          
+          # Import script
+          REGION="${{ env.AWS_REGION }}"
+          
+          # Import ECR repos
+          terraform import 'module.ecr["purchase-service"].aws_ecr_repository.this' purchase-service 2>/dev/null || true
+          terraform import 'module.ecr["query-service"].aws_ecr_repository.this' query-service 2>/dev/null || true
+          terraform import 'module.ecr["mq-projection-service"].aws_ecr_repository.this' mq-projection-service 2>/dev/null || true
+          
+          # Import Target Groups
+          TG_PURCHASE=$(aws elbv2 describe-target-groups --region $REGION --query "TargetGroups[?TargetGroupName=='purchase-service-tg'].TargetGroupArn" --output text 2>/dev/null || echo "")
+          TG_QUERY=$(aws elbv2 describe-target-groups --region $REGION --query "TargetGroups[?TargetGroupName=='query-service-tg'].TargetGroupArn" --output text 2>/dev/null || echo "")
+          TG_MQ=$(aws elbv2 describe-target-groups --region $REGION --query "TargetGroups[?TargetGroupName=='mq-projection-service-tg'].TargetGroupArn" --output text 2>/dev/null || echo "")
+          
+          [ ! -z "$TG_PURCHASE" ] && terraform import 'module.shared_alb.aws_lb_target_group.services["purchase-service"]' "$TG_PURCHASE" 2>/dev/null || true
+          [ ! -z "$TG_QUERY" ] && terraform import 'module.shared_alb.aws_lb_target_group.services["query-service"]' "$TG_QUERY" 2>/dev/null || true
+          [ ! -z "$TG_MQ" ] && terraform import 'module.shared_alb.aws_lb_target_group.services["mq-projection-service"]' "$TG_MQ" 2>/dev/null || true
+          
+          # Import Log Groups
+          terraform import 'module.logging["purchase-service"].aws_cloudwatch_log_group.this' /ecs/purchase-service 2>/dev/null || true
+          terraform import 'module.logging["query-service"].aws_cloudwatch_log_group.this' /ecs/query-service 2>/dev/null || true
+          terraform import 'module.logging["mq-projection-service"].aws_cloudwatch_log_group.this' /ecs/mq-projection-service 2>/dev/null || true
+          
+          # Import Secrets
+          terraform import 'module.elasticache.aws_secretsmanager_secret.redis' ticketing-redis-credentials 2>/dev/null || true
+          terraform import 'module.rds.aws_secretsmanager_secret.db' ticketing-db-credentials 2>/dev/null || true
+          
+          # Import ElastiCache resources
+          terraform import 'module.elasticache.aws_elasticache_subnet_group.this' ticketing-cache-subnet-group 2>/dev/null || true
+          terraform import 'module.elasticache.aws_elasticache_parameter_group.this' ticketing-redis-params 2>/dev/null || true
+          
+          # Import RDS resources
+          terraform import 'module.rds.aws_db_subnet_group.default' ticketing-aurora-subnet-group 2>/dev/null || true
+          terraform import 'module.rds.aws_rds_cluster_parameter_group.this' ticketing-mysql-params 2>/dev/null || true
+          
+          # Import IAM Policy
+          POLICY_ARN=$(aws iam list-policies --query "Policies[?PolicyName=='ticketing-message-messaging-access'].Arn" --output text 2>/dev/null || echo "")
+          [ ! -z "$POLICY_ARN" ] && terraform import 'module.messaging.aws_iam_policy.messaging_access' "$POLICY_ARN" 2>/dev/null || true
+          
+          # Import Security Groups
+          ALB_SG=$(aws ec2 describe-security-groups --region $REGION --filters "Name=group-name,Values=ticketing-alb-sg" --query "SecurityGroups[0].GroupId" --output text 2>/dev/null || echo "")
+          [ ! -z "$ALB_SG" ] && [ "$ALB_SG" != "None" ] && terraform import 'module.network.aws_security_group.alb_sg' "$ALB_SG" 2>/dev/null || true
+          
+          echo "✅ Import attempts complete - retrying plan..."
+
+      - name: Terraform Plan (Retry after import)
+        if: github.event.inputs.action != 'destroy-infrastructure' && steps.plan.outcome == 'failure'
+        working-directory: ./config/terraform
+        run: terraform plan -no-color
+
+      - name: Terraform Apply
+        id: apply
+        working-directory: ./config/terraform
+        continue-on-error: true
         run: terraform apply -auto-approve
         if: github.event.inputs.action != 'destroy-infrastructure'
+
+      - name: Handle Apply Failures (Retry with targeted imports)
+        if: github.event.inputs.action != 'destroy-infrastructure' && steps.apply.outcome == 'failure'
+        working-directory: ./config/terraform
+        run: |
+          echo "⚠️ Apply failed - attempting comprehensive import and retry..."
+          
+          REGION="${{ env.AWS_REGION }}"
+          
+          # Comprehensive import of all possible resources
+          echo "📦 Importing all existing resources..."
+          
+          # ECR
+          for repo in purchase-service query-service mq-projection-service; do
+            terraform import "module.ecr[\"$repo\"].aws_ecr_repository.this" $repo 2>/dev/null || true
+          done
+          
+          # Target Groups
+          for tg_name in purchase-service-tg query-service-tg mq-projection-service-tg; do
+            TG_ARN=$(aws elbv2 describe-target-groups --region $REGION --query "TargetGroups[?TargetGroupName=='$tg_name'].TargetGroupArn" --output text 2>/dev/null || echo "")
+            if [ ! -z "$TG_ARN" ]; then
+              service_name=$(echo $tg_name | sed 's/-tg$//')
+              terraform import "module.shared_alb.aws_lb_target_group.services[\"$service_name\"]" "$TG_ARN" 2>/dev/null || true
+            fi
+          done
+          
+          # All other resources
+          terraform import 'module.logging["purchase-service"].aws_cloudwatch_log_group.this' /ecs/purchase-service 2>/dev/null || true
+          terraform import 'module.logging["query-service"].aws_cloudwatch_log_group.this' /ecs/query-service 2>/dev/null || true
+          terraform import 'module.logging["mq-projection-service"].aws_cloudwatch_log_group.this' /ecs/mq-projection-service 2>/dev/null || true
+          terraform import 'module.elasticache.aws_secretsmanager_secret.redis' ticketing-redis-credentials 2>/dev/null || true
+          terraform import 'module.rds.aws_secretsmanager_secret.db' ticketing-db-credentials 2>/dev/null || true
+          terraform import 'module.elasticache.aws_elasticache_subnet_group.this' ticketing-cache-subnet-group 2>/dev/null || true
+          terraform import 'module.elasticache.aws_elasticache_parameter_group.this' ticketing-redis-params 2>/dev/null || true
+          terraform import 'module.rds.aws_db_subnet_group.default' ticketing-aurora-subnet-group 2>/dev/null || true
+          terraform import 'module.rds.aws_rds_cluster_parameter_group.this' ticketing-mysql-params 2>/dev/null || true
+          
+          POLICY_ARN=$(aws iam list-policies --query "Policies[?PolicyName=='ticketing-message-messaging-access'].Arn" --output text 2>/dev/null || echo "")
+          [ ! -z "$POLICY_ARN" ] && terraform import 'module.messaging.aws_iam_policy.messaging_access' "$POLICY_ARN" 2>/dev/null || true
+          
+          ALB_SG=$(aws ec2 describe-security-groups --region $REGION --filters "Name=group-name,Values=ticketing-alb-sg" --query "SecurityGroups[0].GroupId" --output text 2>/dev/null || echo "")
+          [ ! -z "$ALB_SG" ] && [ "$ALB_SG" != "None" ] && terraform import 'module.network.aws_security_group.alb_sg' "$ALB_SG" 2>/dev/null || true
+          
+          echo "✅ Import complete - retrying apply..."
+          terraform apply -auto-approve
+
+      - name: Verify Apply Success
+        if: github.event.inputs.action != 'destroy-infrastructure'
+        run: |
+          if [ "${{ steps.apply.outcome }}" = "failure" ]; then
+            echo "❌ Terraform apply failed even after import attempts"
+            echo "Check logs above for details"
+            exit 1
+          fi
+          echo "✅ Terraform apply successful"
 
       # Save state AFTER successful apply for future destroy operations
       - name: Save Terraform State
