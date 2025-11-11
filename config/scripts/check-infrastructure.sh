@@ -171,7 +171,7 @@ print_metric "Messages Delayed" "$messages_delayed"
 
 # Count messages received by consumer
 sqs_received=$(aws logs filter-log-events \
-    --log-group-name /ecs/mq-projection-service \
+    --log-group-name /ecs/message-persistence-service \
     --filter-pattern "Received ticketId" \
     --start-time "$START_TIME" \
     --region "$AWS_REGION" \

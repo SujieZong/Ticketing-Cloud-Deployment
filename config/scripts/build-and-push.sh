@@ -50,8 +50,8 @@ aws ecr get-login-password --region "$AWS_REGION" \
 
 # === Build & Push Images =====================================================
 # Service directory name -> Terraform service key mapping
-SERVICES_DIRS=("PurchaseService" "QueryService" "RabbitCombinedConsumer")
-SERVICES_KEYS=("purchase-service" "query-service" "mq-projection-service")
+SERVICES_DIRS=("PurchaseService" "QueryService" "MessagePersistenceService")
+SERVICES_KEYS=("purchase-service" "query-service" "message-persistence-service")
 
 echo "[INFO] Building & pushing Docker images... TAG=$TAG"
 
@@ -77,7 +77,7 @@ terraform apply -auto-approve -no-color \
   -var="service_image_tags={
     \"purchase-service\":\"$TAG\",
     \"query-service\":\"$TAG\",
-    \"mq-projection-service\":\"$TAG\"
+    \"message-persistence-service\":\"$TAG\"
   }"
 popd >/dev/null
 

@@ -14,6 +14,11 @@ variable "rds_port" {
   description = "Port to expose for rds"
   type        = number
 }
+variable "redis_port" {
+  description = "Port to expose for redis"
+  type        = number
+  default     = 6379
+}
 variable "cidr_blocks" {
   description = "Which CIDRs can reach the service"
   type        = list(string)

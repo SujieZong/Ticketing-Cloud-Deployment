@@ -95,4 +95,30 @@ resource "aws_security_group" "rds_sg" {
   }
 }
 
+# ====== Redis Security Group =====
+resource "aws_security_group" "redis_sg" {
+  name   = "${var.service_name}-redis-sg"
+  vpc_id = data.aws_vpc.default.id
+
+  ingress {
+    from_port       = var.redis_port
+    to_port         = var.redis_port
+    protocol        = "tcp"
+    security_groups = [aws_security_group.this.id]
+    description     = "Redis only allow access from ECS"
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+    description = "Allow all outbound traffic"
+  }
+
+  tags = {
+    Name = "${var.service_name}-redis-sg"
+  }
+}
+
 

@@ -11,7 +11,7 @@
     <modules>
         <!--        <module>TicketContracts</module>-->
         <module>PurchaseService</module>
-        <module>RabbitCombinedConsumer</module>
+        <module>MessagePersistenceService</module>
         <module>QueryService</module>
     </modules>
 
@@ -21,7 +21,6 @@
         <spring.cloud.version>2024.0.0</spring.cloud.version>
         <mapstruct.version>1.5.5.Final</mapstruct.version>
         <lombok.version>1.18.36</lombok.version>
-        <rabbit.version>5.26.0</rabbit.version>
         <awspring.version>3.1.0</awspring.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     </properties>
@@ -69,28 +68,12 @@
                 <artifactId>lombok</artifactId>
                 <version>${lombok.version}</version>
             </dependency>
-
-            <dependency>
-                <groupId>com.rabbitmq</groupId>
-                <artifactId>amqp-client</artifactId>
-                <version>${rabbit.version}</version>
-            </dependency>
         </dependencies>
     </dependencyManagement>
 
     <build>
         <pluginManagement>
             <plugins>
-                <!-- Java release -->
-                <plugin>
-                    <groupId>org.apache.maven.plugins</groupId>
-                    <artifactId>maven-compiler-plugin</artifactId>
-                    <version>3.11.0</version>
-                    <configuration>
-                        <release>${java.version}</release>
-                    </configuration>
-                </plugin>
-
                 <!-- Spring Boot-->
                 <plugin>
                     <groupId>org.springframework.boot</groupId>
@@ -98,6 +81,7 @@
                     <version>${spring.boot.version}</version>
                 </plugin>
 
+                <!-- Java Compiler with Lombok and MapStruct -->
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-compiler-plugin</artifactId>

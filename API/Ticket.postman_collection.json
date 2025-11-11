@@ -1,0 +1,320 @@
+{
+	"info": {
+		"_postman_id": "d745ce34-35d4-4730-8abf-a19e2839e0b2",
+		"name": "Ticket",
+		"description": "High-Concurrency-CQRS-Ticketing-Platform Testings",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "41536910",
+		"_collection_link": "https://cs6620-9258.postman.co/workspace/Workspace~5061c2bf-09b0-49c3-8507-89dc4fa5419a/collection/41536910-d745ce34-35d4-4730-8abf-a19e2839e0b2?action=share&source=collection_link&creator=41536910"
+	},
+	"item": [
+		{
+			"name": "PurchaseQuery",
+			"item": [
+				{
+					"name": "Health Checks",
+					"item": [
+						{
+							"name": "Purchase Service Health",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{alb}}/purchase/health",
+									"host": [
+										"{{alb}}"
+									],
+									"path": [
+										"purchase",
+										"health"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Query Service Health",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{alb}}/query/health",
+									"host": [
+										"{{alb}}"
+									],
+									"path": [
+										"query",
+										"health"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "projection",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{alb}}/events/health",
+									"host": [
+										"{{alb}}"
+									],
+									"path": [
+										"events",
+										"health"
+									]
+								}
+							},
+							"response": []
+						}
+					]
+				},
+				{
+					"name": "Purchase",
+					"item": [
+						{
+							"name": "Purchase",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"// Parse response JSON",
+											"let jsonData = pm.response.json();",
+											"pm.environment.set(\"ticketId\", jsonData.ticketId);",
+											"console.log(\"Saved ticketId:\", jsonData.ticketId);",
+											"",
+											"",
+											"setTimeout(() => {",
+											"    console.log(\"Waited 1 second after POST before running next request...\");",
+											"}, 1000);"
+										],
+										"type": "text/javascript",
+										"packages": {},
+										"requests": {}
+									}
+								}
+							],
+							"request": {
+								"method": "POST",
+								"header": [],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"venueId\": \"Venue1\",\n    \"eventId\": \"Event1\",\n    \"zoneId\": 1,\n    \"row\": \"c\",\n    \"column\": \"2\"\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{alb}}/purchase/api/v1/tickets",
+									"host": [
+										"{{alb}}"
+									],
+									"path": [
+										"purchase",
+										"api",
+										"v1",
+										"tickets"
+									]
+								}
+							},
+							"response": []
+						}
+					]
+				},
+				{
+					"name": "Query",
+					"item": [
+						{
+							"name": "AllTickets",
+							"request": {
+								"auth": {
+									"type": "noauth"
+								},
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{alb}}/query/api/v1/tickets",
+									"host": [
+										"{{alb}}"
+									],
+									"path": [
+										"query",
+										"api",
+										"v1",
+										"tickets"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "getTicket",
+							"request": {
+								"auth": {
+									"type": "noauth"
+								},
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{alb}}/query/api/v1/tickets/{{ticketId}}",
+									"host": [
+										"{{alb}}"
+									],
+									"path": [
+										"query",
+										"api",
+										"v1",
+										"tickets",
+										"{{ticketId}}"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "getEventCount",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{alb}}/query/api/v1/tickets/count/Event1",
+									"host": [
+										"{{alb}}"
+									],
+									"path": [
+										"query",
+										"api",
+										"v1",
+										"tickets",
+										"count",
+										"Event1"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "getRevenue",
+							"request": {
+								"auth": {
+									"type": "noauth"
+								},
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{alb}}/query/api/v1/tickets/revenue/venue1/event1",
+									"host": [
+										"{{alb}}"
+									],
+									"path": [
+										"query",
+										"api",
+										"v1",
+										"tickets",
+										"revenue",
+										"venue1",
+										"event1"
+									]
+								}
+							},
+							"response": []
+						}
+					]
+				}
+			]
+		},
+		{
+			"name": "Restore",
+			"item": [
+				{
+					"name": "ClearRedis",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "http://localhost:8080/admin/reset/redis",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "8080",
+							"path": [
+								"admin",
+								"reset",
+								"redis"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "resetMySQL",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "http://localhost:8080/admin/reset/mysql",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "8080",
+							"path": [
+								"admin",
+								"reset",
+								"mysql"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		}
+	],
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"packages": {},
+				"requests": {},
+				"exec": [
+					""
+				]
+			}
+		},
+		{
+			"listen": "test",
+			"script": {
+				"type": "text/javascript",
+				"packages": {},
+				"requests": {},
+				"exec": [
+					""
+				]
+			}
+		}
+	],
+	"variable": [
+		{
+			"key": "Ticket-Write",
+			"value": "http://localhost:8080/api/v1/tickets"
+		},
+		{
+			"key": "Ticket-Read",
+			"value": "http://localhost:8081/api/v1/tickets"
+		},
+		{
+			"key": "ticketId",
+			"value": "4ebadf55-dbfa-4884-afaa-f001308bc7b0"
+		},
+		{
+			"key": "alb",
+			"value": ""
+		}
+	]
+}

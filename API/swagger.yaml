@@ -1,0 +1,388 @@
+openapi: 3.0.3
+info:
+  title: High-Concurrency CQRS Ticketing Platform API
+  description: API documentation for the ticketing system with CQRS architecture
+  version: 1.0.0
+  contact:
+    name: API Support
+servers:
+  - url: '{alb}'
+    description: ALB Load Balancer
+    variables:
+      alb:
+        default: http://AWS-Loadbalancer-URL
+        description: ALB URL
+
+paths:
+  # Health Check Endpoints
+  /purchase/health:
+    get:
+      summary: Purchase Service Health Check
+      description: Check if the purchase service is healthy
+      tags:
+        - Health
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: UP
+
+  /query/health:
+    get:
+      summary: Query Service Health Check
+      description: Check if the query service is healthy
+      tags:
+        - Health
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: UP
+
+  /events/health:
+    get:
+      summary: Events Service Health Check
+      description: Check if the events/projection service is healthy
+      tags:
+        - Health
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: UP
+
+  # Purchase Endpoints
+  /purchase/api/v1/tickets:
+    post:
+      summary: Purchase a Ticket
+      description: Purchase a new ticket for an event
+      tags:
+        - Purchase
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TicketPurchaseRequest'
+      responses:
+        '201':
+          description: Ticket purchased successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TicketPurchaseResponse'
+        '400':
+          description: Invalid request data
+        '409':
+          description: Ticket already sold or unavailable
+
+  # Query Endpoints
+  /query/api/v1/tickets:
+    get:
+      summary: Get All Tickets
+      description: Retrieve all tickets in the system
+      tags:
+        - Query
+      responses:
+        '200':
+          description: List of all tickets
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Ticket'
+
+  /query/api/v1/tickets/{ticketId}:
+    get:
+      summary: Get Ticket by ID
+      description: Retrieve a specific ticket by its ID
+      tags:
+        - Query
+      parameters:
+        - name: ticketId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Unique identifier of the ticket
+      responses:
+        '200':
+          description: Ticket details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Ticket'
+        '404':
+          description: Ticket not found
+
+  /query/api/v1/tickets/count/{eventId}:
+    get:
+      summary: Get Event Ticket Count
+      description: Get the total number of tickets sold for a specific event
+      tags:
+        - Query
+      parameters:
+        - name: eventId
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Unique identifier of the event
+      responses:
+        '200':
+          description: Ticket count for the event
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  eventId:
+                    type: string
+                    example: Event1
+                  count:
+                    type: integer
+                    example: 150
+
+  /query/api/v1/tickets/revenue/{venueId}/{eventId}:
+    get:
+      summary: Get Event Revenue
+      description: Get the total revenue generated from ticket sales for a specific event
+      tags:
+        - Query
+      parameters:
+        - name: venueId
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Unique identifier of the venue
+        - name: eventId
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Unique identifier of the event
+      responses:
+        '200':
+          description: Revenue data for the event
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  venueId:
+                    type: string
+                    example: venue1
+                  eventId:
+                    type: string
+                    example: event1
+                  totalRevenue:
+                    type: number
+                    format: float
+                    example: 15750
+
+  # Admin Endpoints
+  /admin/reset/redis:
+    post:
+      summary: Clear Redis Cache
+      description: Clear all data from Redis cache (Admin only)
+      tags:
+        - Admin
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Redis cache cleared successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Redis cache cleared successfully
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden
+
+  /admin/reset/mysql:
+    post:
+      summary: Reset MySQL Database
+      description: Reset the MySQL database to initial state (Admin only)
+      tags:
+        - Admin
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: MySQL database reset successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: MySQL database reset successfully
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden
+
+components:
+  schemas:
+    TicketPurchaseRequest:
+      type: object
+      required:
+        - venueId
+        - eventId
+        - zoneId
+        - row
+        - column
+      properties:
+        venueId:
+          type: string
+          description: Unique identifier of the venue
+          example: Venue1
+        eventId:
+          type: string
+          description: Unique identifier of the event
+          example: Event1
+        zoneId:
+          type: integer
+          description: Zone identifier within the venue
+          example: 1
+        row:
+          type: string
+          description: Row identifier
+          example: c
+        column:
+          type: string
+          description: Column identifier
+          example: '2'
+
+    TicketPurchaseResponse:
+      type: object
+      required:
+        - ticketId
+      properties:
+        ticketId:
+          type: string
+          format: uuid
+          description: Unique identifier of the purchased ticket
+          example: 4ebadf55-dbfa-4884-afaa-f001308bc7b0
+        venueId:
+          type: string
+          example: Venue1
+        eventId:
+          type: string
+          example: Event1
+        zoneId:
+          type: integer
+          example: 1
+        row:
+          type: string
+          example: c
+        column:
+          type: string
+          example: '2'
+        purchaseTime:
+          type: string
+          format: date-time
+          example: '2025-11-03T10:30:00Z'
+        price:
+          type: number
+          format: float
+          example: 75
+
+    Ticket:
+      type: object
+      required:
+        - ticketId
+        - venueId
+        - eventId
+        - zoneId
+        - row
+        - column
+      properties:
+        ticketId:
+          type: string
+          format: uuid
+          description: Unique identifier of the ticket
+          example: 4ebadf55-dbfa-4884-afaa-f001308bc7b0
+        venueId:
+          type: string
+          description: Unique identifier of the venue
+          example: Venue1
+        eventId:
+          type: string
+          description: Unique identifier of the event
+          example: Event1
+        zoneId:
+          type: integer
+          description: Zone identifier within the venue
+          example: 1
+        row:
+          type: string
+          description: Row identifier
+          example: c
+        column:
+          type: string
+          description: Column identifier
+          example: '2'
+        purchaseTime:
+          type: string
+          format: date-time
+          example: '2025-11-03T10:30:00Z'
+        price:
+          type: number
+          format: float
+          example: 75
+        status:
+          type: string
+          enum:
+            - active
+            - cancelled
+            - used
+          example: active
+
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+tags:
+  - name: Health
+    description: Health check endpoints for all services
+  - name: Purchase
+    description: Ticket purchase operations (Command side)
+  - name: Query
+    description: Ticket query operations (Query side)
+  - name: Admin
+    description: Administrative operations for system maintenance
+Resources:
+  Service:
+    Type: AWS::ECS::Service
+    Properties: {}

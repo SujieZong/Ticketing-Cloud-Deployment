@@ -10,8 +10,8 @@ variable "subnet_ids" {
   type = list(string)
 }
 
-variable "ecs_security_group_ids" {
-  type = list(string)
+variable "redis_security_group_id" {
+  type = string
 }
 
 variable "engine_version" {

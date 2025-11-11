@@ -31,6 +31,7 @@ module "network" {
   container_port = var.container_port
   alb_port       = var.alb_port
   rds_port       = var.rds_port
+  redis_port     = var.elasticache_port
   cidr_blocks    = var.allowed_ingress_cidrs
 }
 
@@ -43,49 +44,6 @@ module "ecr" {
   repository_name = each.value.repository_name
   region          = var.aws_region
 }
-
-# ==============================================================================
-# Docker Build & Push - Build locally and push to ECR
-# ==============================================================================
-# COMMENTED OUT: Now using external build-and-push.sh script for better control
-# This approach allows for:
-# - Multi-architecture builds (linux/amd64, linux/arm64)
-# - Better build caching with Docker buildx
-# - Git commit hash as image tags
-# - Separation of build and deploy steps
-# - Easier troubleshooting of network issues
-# - Parallel builds across services
-#
-# Usage: ./config/scripts/build-and-push.sh
-
-# locals {
-#   service_directory_map = {
-#     "purchase-service"      = "PurchaseService"
-#     "query-service"         = "QueryService"
-#     "mq-projection-service" = "RabbitCombinedConsumer"
-#   }
-# }
-
-# resource "docker_image" "app" {
-#   for_each = local.app_services
-#
-#   name = "${module.ecr[each.key].repository_url}:${each.value.image_tag}"
-#
-#   build {
-#     context    = "${path.root}/../../${local.service_directory_map[each.key]}"
-#     dockerfile = "Dockerfile"
-#   }
-#
-#   depends_on = [module.ecr]
-# }
-
-# resource "docker_registry_image" "app" {
-#   for_each = local.app_services
-#
-#   name = docker_image.app[each.key].name
-#
-#   depends_on = [docker_image.app]
-# }
 
 # ==============================================================================
 # Logging Module - CloudWatch Logs (per service)
@@ -109,9 +67,9 @@ module "shared_alb" {
   security_group_id = module.network.alb_security_group_id
   health_check_path = "/health"
   service_health_check_paths = {
-    "purchase-service"      = "/purchase/health"
-    "query-service"         = "/query/health"
-    "mq-projection-service" = "/events/health"
+    "purchase-service"            = "/purchase/health"
+    "query-service"               = "/query/health"
+    "message-persistence-service" = "/events/health"
   }
   service_path_patterns = var.service_path_patterns
   service_http_methods  = var.service_http_methods
@@ -162,6 +120,7 @@ module "ecs" {
 
   # Docker images should already exist in ECR before deployment
   # Use build-and-push.sh to build and push images first
+  # Or use CI/CD pipeline to handle build and deployment
   depends_on = [module.ecr]
 }
 module "messaging" {
@@ -198,7 +157,7 @@ module "elasticache" {
   name                     = "ticketing"
   vpc_id                   = module.network.vpc_id
   subnet_ids               = module.network.subnet_ids
-  ecs_security_group_ids   = [module.network.ecs_security_group_id]
+  redis_security_group_id  = module.network.redis_security_group_id
   engine_version           = var.elasticache_engine_version
   node_type                = var.elasticache_node_type
   port                     = var.elasticache_port

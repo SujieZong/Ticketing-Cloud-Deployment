@@ -10,7 +10,7 @@ output "redis_port" {
 
 output "redis_sg_id" {
   description = "Security group ID for Redis"
-  value       = aws_security_group.redis_sg.id
+  value       = var.redis_security_group_id
 }
 
 output "redis_secret_arn" {

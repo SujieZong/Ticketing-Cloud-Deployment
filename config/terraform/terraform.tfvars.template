@@ -35,8 +35,8 @@ app_services = {
     image_tag       = "latest"
   }
 
-  mq-projection-service = {
-    repository_name = "mq-projection-service"
+  message-persistence-service = {
+    repository_name = "message-persistence-service"
     container_port  = 8080
     cpu             = "512"
     memory          = "1024"
@@ -65,7 +65,7 @@ ecs_autoscaling_overrides = {
     scale_out_cooldown = 300
   }
 
-  "mq-projection-service" = {
+  "message-persistence-service" = {
     min_capacity       = 1
     max_capacity       = 3
     cpu_target_value   = 70

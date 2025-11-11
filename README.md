@@ -10,8 +10,15 @@ A high-performance ticketing system built with CQRS pattern, implementing read-w
 - [Troubleshooting](#troubleshooting)
 
 ## Architecture Overview
+![alt text](config/Graphs/network_boundaries_v3.png)
 
 ### CQRS Pattern Implementation
+
+Structure is related to the Project "High-Concurrency-CQRS-Ticketing-Platform" with adjustments according to AWS services. 
+- Kafka --> SNS + SQS
+- Redis in Elasticache
+- MySQL in RDS Aurora MysQL
+
 This system implements Command Query Responsibility Segregation (CQRS) with event-driven architecture:
 
 ```
@@ -38,7 +45,7 @@ Ticket Purchase Request → PurchaseService (Redis seat locking + SNS event publ
 |---------|------|----------------|--------------|
 | **PurchaseService** | 8080 | Handle ticket purchases, seat locking, event publishing | Redis + SNS |
 | **QueryService** | 8081 | Provide ticket query and analytics APIs | MySQL + JPA |
-| **SqsConsumer** | N/A | Consume events and project data to MySQL | SQS + MySQL |
+| **MessagePersistenceService** | N/A | Consume events and persist data to MySQL | SQS + MySQL |
 
 ### Infrastructure Components
 
@@ -60,7 +67,7 @@ Ticket Purchase Request → PurchaseService (Redis seat locking + SNS event publ
 |---------|------|----------------|------------------|---------------|
 | **PurchaseService** | 8080 | Write operations - ticket purchases | Spring Boot, Redis, SNS | Redis seat locking, SNS event publishing, Input validation |
 | **QueryService** | 8081 | Read operations - ticket queries | Spring Boot, JPA, MySQL | Multi-dimensional queries, Revenue analytics, Optimized reads |
-| **SqsConsumer** | N/A | Event consumption & data projection | Spring Boot, SQS, MySQL | Async processing, Transactional consistency, Dead letter handling |
+| **MessagePersistenceService** | N/A | Event consumption & data projection | Spring Boot, SQS, MySQL | Async processing, Transactional consistency, Dead letter handling |
 
 ## API Documentation
 
@@ -101,7 +108,7 @@ GET /query/api/v1/tickets/revenue/{venueId}/{eventId}
 GET /query/health
 ```
 
-#### MQ Projection Service (`/events/*`)
+#### Message Persistence Service (`/events/*`)
 ```bash
 # Health check (monitoring only)
 GET /events/health
@@ -214,31 +221,4 @@ cd config/terraform
 terraform destroy -auto-approve
 ```
 
-## Troubleshooting
 
-### Common Issues
-
-**Service Health Check Failures**
-- Verify AWS credentials: `aws sts get-caller-identity`
-- Check CloudWatch logs for error messages
-- Ensure security groups allow ALB → ECS communication
-
-**Database Connection Errors**
-- Verify RDS cluster status in AWS Console
-- Check Secrets Manager for correct credentials
-- Confirm VPC and subnet configuration
-
-**Message Processing Issues**
-- Check SQS queue has messages: `aws sqs get-queue-attributes`
-- Review CloudWatch logs for SQS consumer errors
-- Verify SNS topic subscriptions exist
-
-**Terraform Errors**
-- Run `terraform init` to update providers
-- Check IAM permissions for Terraform operations
-- Verify AWS service quotas are sufficient
-
-### Monitoring
-- **CloudWatch Logs**: `/ecs/{service-name}` log groups
-- **Health Checks**: `curl http://<alb>/purchase/health`
-- **Infrastructure Script**: `./config/scripts/check-infrastructure.sh`
