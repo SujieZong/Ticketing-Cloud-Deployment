@@ -35,14 +35,14 @@ jobs:
         run: |
           cd PurchaseService && mvn clean package -DskipTests
           cd ../QueryService && mvn clean package -DskipTests
-          cd ../RabbitCombinedConsumer && mvn clean package -DskipTests
+          cd ../MessagePersistenceService && mvn clean package -DskipTests
       - uses: actions/upload-artifact@v4
         with:
           name: service-jars
           path: |
             PurchaseService/target/*.jar
             QueryService/target/*.jar
-            RabbitCombinedConsumer/target/*.jar
+            MessagePersistenceService/target/*.jar
           retention-days: 1
 
   force-cleanup:
@@ -93,11 +93,25 @@ jobs:
       - name: Create tfvars
         working-directory: ./config/terraform
         run: |
+          # Get current AWS account ID
           ACCT=$(aws sts get-caller-identity --query Account --output text)
-          cat > terraform.tfvars <<TFVARS
-          aws_region     = "${{ env.AWS_REGION }}"
-          aws_account_id = "$ACCT"
-          TFVARS
+          
+          # Create terraform.tfvars from template
+          cp terraform.tfvars.template terraform.tfvars
+          
+          # Replace placeholders with actual values
+          sed -i.bak "s/YOUR_AWS_ACCOUNT_ID/$ACCT/g" terraform.tfvars
+          sed -i.bak "s/aws_region         = \".*\"/aws_region         = \"${{ env.AWS_REGION }}\"/" terraform.tfvars
+          sed -i.bak "s/YOUR_IP_ADDRESS/${{ secrets.ALLOWED_IP }}/g" terraform.tfvars
+          
+          # AWS credentials are already configured via aws-actions/configure-aws-credentials
+          # So we can remove the credential lines from tfvars
+          sed -i.bak '/aws_access_key_id/d' terraform.tfvars
+          sed -i.bak '/aws_secret_access_key/d' terraform.tfvars
+          sed -i.bak '/aws_session_token/d' terraform.tfvars
+          
+          echo "Generated terraform.tfvars:"
+          cat terraform.tfvars
       - name: Init
         working-directory: ./config/terraform
         run: terraform init -upgrade
@@ -114,12 +128,12 @@ jobs:
 
           imp 'module.ecr["purchase-service"].aws_ecr_repository.this' 'purchase-service'
           imp 'module.ecr["query-service"].aws_ecr_repository.this' 'query-service'
-          imp 'module.ecr["mq-projection-service"].aws_ecr_repository.this' 'mq-projection-service'
+          imp 'module.ecr["message-persistence-service"].aws_ecr_repository.this' 'message-persistence-service'
 
           ALB=$(aws elbv2 describe-load-balancers --region $REGION --query "LoadBalancers[?LoadBalancerName=='ticketing-alb'].LoadBalancerArn" --output text 2>/dev/null || echo "")
           [ -n "$ALB" ] && imp 'module.shared_alb.aws_lb.shared' "$ALB"
 
-          for svc in purchase query mq-projection; do
+          for svc in purchase query message-persistence; do
             TG=$(aws elbv2 describe-target-groups --region $REGION --query "TargetGroups[?TargetGroupName=='${svc}-service-tg'].TargetGroupArn" --output text 2>/dev/null || echo "")
             [ -n "$TG" ] && imp "module.shared_alb.aws_lb_target_group.services[\"${svc}-service\"]" "$TG"
           done
@@ -146,7 +160,7 @@ jobs:
           imp 'module.elasticache.aws_elasticache_parameter_group.this' 'ticketing-redis-params'
           imp 'module.elasticache.aws_elasticache_replication_group.this' 'ticketing-redis'
 
-          for svc in purchase query mq-projection; do
+          for svc in purchase query message-persistence; do
             imp "module.logging[\"${svc}-service\"].aws_cloudwatch_log_group.this" "/ecs/${svc}-service"
           done
 
@@ -212,10 +226,10 @@ jobs:
         run: |
           docker buildx build --platform linux/amd64 --push -t $ECR/purchase-service:$TAG -t $ECR/purchase-service:latest ./PurchaseService
           docker buildx build --platform linux/amd64 --push -t $ECR/query-service:$TAG -t $ECR/query-service:latest ./QueryService
-          docker buildx build --platform linux/amd64 --push -t $ECR/mq-projection-service:$TAG -t $ECR/mq-projection-service:latest ./RabbitCombinedConsumer
+          docker buildx build --platform linux/amd64 --push -t $ECR/message-persistence-service:$TAG -t $ECR/message-persistence-service:latest ./MessagePersistenceService
       - name: Update ECS
         run: |
-          for svc in purchase query mq-projection; do
+          for svc in purchase query message-persistence; do
             aws ecs update-service --cluster ${svc}-service-cluster --service ${svc}-service --force-new-deployment --region ${{ env.AWS_REGION }} 2>&1 || true
           done
           sleep 120
