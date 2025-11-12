@@ -9,7 +9,7 @@ variable "rds_username" {
 }
 
 variable "rds_instances" {
-  description = "Total number of Aurora instances (1 writer + N readers)"
+  description = "Total number of Aurora instances, 1 writer N readers"
   type        = number
   default     = 1
   validation {
@@ -19,7 +19,7 @@ variable "rds_instances" {
 }
 
 variable "rds_instance_class" {
-  description = "Instance class for Aurora instances (e.g., db.t4g.medium)"
+  description = "Instance for Aurora"
   type        = string
   default     = "db.t4g.medium"
 }
