@@ -11,7 +11,7 @@ variable "vpc_cidr" {
 variable "allowed_ingress_cidrs" {
   description = "CIDR blocks allowed to access the ALB (security group ingress)"
   type        = list(string)
-  default     = ["209.121.228.207/32"]
+  default     = ["0.0.0.0/0"]
 }
 
 variable "alb_port" {

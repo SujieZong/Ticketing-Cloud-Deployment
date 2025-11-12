@@ -28,8 +28,9 @@ public class MySqlTicketDao implements MySqlTicketDAOInterface {
 				    zone_id, row_label, col_label, status,
 				    created_on
 				  ) VALUES(?,?,?,?,?,?,?,?)
+				  AS new
 				  ON DUPLICATE KEY UPDATE
-				    status = VALUES(status)
+				    status = new.status
 				""";
 		try {
 			jdbcTemplate.update(
