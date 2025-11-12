@@ -130,7 +130,7 @@ jobs:
         working-directory: ./config/terraform
         run: terraform init -upgrade
       - name: Import Resources
-        if: github.event.inputs.action != 'destroy-infrastructure'
+        if: github.event.inputs.action != 'destroy-infrastructure' && github.event.inputs.import_existing == 'true'
         working-directory: ./config/terraform
         continue-on-error: true
         run: |
