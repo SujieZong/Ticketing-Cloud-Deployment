@@ -14,6 +14,11 @@ on:
           - services-only
           - destroy-infrastructure
           - force-cleanup
+      import_existing:
+        description: "Import existing cloud resources into TF state (use only for takeover/recovery)"
+        required: false
+        type: boolean
+        default: false
 
 env:
   AWS_REGION: us-west-2
