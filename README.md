@@ -43,7 +43,7 @@ Ticket Purchase Request → PurchaseService (Redis seat locking + SNS event publ
 
 ### Network Architecture Diagram
 
-<img src="config/graphs/network_boundaries_v3.png" alt="Ticketing System Network Architecture" width="100%">
+<img src="config/Graphs/network_boundaries_v3.png" alt="Ticketing System Network Architecture" width="100%">
 
 **Components:**
 - **Security Groups:** Network access control
