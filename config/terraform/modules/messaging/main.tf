@@ -7,6 +7,15 @@ resource "aws_sns_topic" "order_events" {
   }
 }
 
+# Dead-letter queue for poison messages
+resource "aws_sqs_queue" "order_dlq" {
+  name                      = "${var.sqs_queue_name}-dlq"
+  message_retention_seconds = var.dlq_message_retention_seconds
+  tags = {
+    Name = "${var.service_name}-sqs-dlq"
+  }
+}
+
 # SQS Queue for order processing
 resource "aws_sqs_queue" "order_queue" {
   name = var.sqs_queue_name
@@ -14,6 +23,10 @@ resource "aws_sqs_queue" "order_queue" {
   visibility_timeout_seconds = var.visibility_timeout_seconds
   message_retention_seconds  = var.message_retention_seconds
   receive_wait_time_seconds  = var.receive_wait_time_seconds
+  redrive_policy = jsonencode({
+    deadLetterTargetArn = aws_sqs_queue.order_dlq.arn
+    maxReceiveCount     = var.max_receive_count
+  })
 
   tags = {
     Name = "${var.service_name}-sqs-queue"

@@ -24,6 +24,15 @@ locals {
   # Dynamically construct IAM role ARNs if not provided
   execution_role_arn = var.execution_role_arn != "" ? var.execution_role_arn : "arn:aws:iam::${var.aws_account_id}:role/LabRole"
   task_role_arn      = var.task_role_arn != "" ? var.task_role_arn : "arn:aws:iam::${var.aws_account_id}:role/LabRole"
+
+  ecs_monitoring_services = {
+    for service, _ in local.app_services : service => {
+      cluster_name = "${service}-cluster"
+      service_name = service
+      min_capacity = local.ecs_autoscaling_configs[service].min_capacity
+      cpu_threshold = try(var.ecs_cpu_warning_overrides[service], null)
+    }
+  }
 }
 
 # ==============================================================================
@@ -135,6 +144,8 @@ module "messaging" {
   visibility_timeout_seconds = var.sqs_visibility_timeout_seconds
   message_retention_seconds  = var.sqs_message_retention_seconds
   receive_wait_time_seconds  = var.sqs_receive_wait_time_seconds
+  max_receive_count          = var.sqs_max_receive_count
+  dlq_message_retention_seconds = var.sqs_dlq_message_retention_seconds
 }
 
 # ==============================================================================
@@ -167,4 +178,22 @@ module "elasticache" {
   port                     = var.elasticache_port
   snapshot_retention_limit = var.elasticache_snapshot_retention_limit
   num_cache_nodes          = var.elasticache_num_nodes
+}
+
+module "monitoring" {
+  count                          = var.enable_monitoring ? 1 : 0
+  source                         = "./modules/monitoring"
+  project_name                   = "ticketing"
+  alb_arn                        = module.shared_alb.alb_arn
+  target_group_arns              = module.shared_alb.target_group_arns
+  sqs_queue_name                 = var.sqs_queue_name
+  rds_cluster_id                 = module.rds.cluster_id
+  redis_replication_group_id     = module.elasticache.redis_replication_group_id
+  ecs_services                   = var.create_ecs_services ? local.ecs_monitoring_services : {}
+  alb_unhealthy_threshold        = var.alb_unhealthy_threshold
+  sqs_backlog_warning_threshold  = var.sqs_backlog_warning_threshold
+  sqs_oldest_message_warning_seconds = var.sqs_oldest_message_warning_seconds
+  rds_connection_warning_threshold   = var.rds_connection_warning_threshold
+  redis_memory_warning_threshold = var.redis_memory_warning_threshold
+  ecs_cpu_warning_threshold      = var.ecs_cpu_warning_threshold
 }

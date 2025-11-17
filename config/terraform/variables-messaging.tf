@@ -31,3 +31,15 @@ variable "sqs_receive_wait_time_seconds" {
   type        = number
   default     = 20
 }
+
+variable "sqs_max_receive_count" {
+  description = "Number of receives before a message is moved to the DLQ"
+  type        = number
+  default     = 5
+}
+
+variable "sqs_dlq_message_retention_seconds" {
+  description = "How long to keep messages in the DLQ"
+  type        = number
+  default     = 1209600
+}

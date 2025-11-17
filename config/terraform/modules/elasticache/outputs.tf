@@ -18,3 +18,8 @@ output "redis_secret_arn" {
   value       = aws_secretsmanager_secret.redis.arn
   sensitive   = true
 }
+
+output "redis_replication_group_id" {
+  description = "Replication group identifier for Redis (monitoring)"
+  value       = aws_elasticache_replication_group.this.id
+}

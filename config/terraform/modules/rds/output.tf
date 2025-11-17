@@ -18,3 +18,8 @@ output "secret_arn" {
   value       = aws_secretsmanager_secret.db.arn
   sensitive   = true
 }
+
+output "cluster_id" {
+  description = "Identifier of the RDS cluster (used for monitoring)"
+  value       = aws_rds_cluster.this.id
+}

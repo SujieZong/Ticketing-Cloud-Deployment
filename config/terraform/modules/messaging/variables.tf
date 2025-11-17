@@ -27,3 +27,13 @@ variable "receive_wait_time_seconds" {
   description = "Receive wait time for long polling"
   type        = number
 }
+
+variable "max_receive_count" {
+  description = "Number of times a message can be received before moving to DLQ"
+  type        = number
+}
+
+variable "dlq_message_retention_seconds" {
+  description = "Retention period for DLQ messages"
+  type        = number
+}
