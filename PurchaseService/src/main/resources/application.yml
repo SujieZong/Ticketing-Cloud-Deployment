@@ -1,5 +1,7 @@
 # AWS deployment configuration
 spring:
+  config:
+    import: "classpath:events.yml,classpath:venues.yml"
   application:
     name: PurchaseService
   main:

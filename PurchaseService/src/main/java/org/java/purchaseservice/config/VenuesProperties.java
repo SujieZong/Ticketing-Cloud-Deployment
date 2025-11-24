@@ -12,5 +12,4 @@ import java.util.Map;
 @ConfigurationProperties(prefix = "venues")
 public class VenuesProperties {
     private Map<String, VenueConfig> map;
-    private VenueConfig defaultConfig;
 }

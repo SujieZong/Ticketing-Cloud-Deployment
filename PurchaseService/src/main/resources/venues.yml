@@ -2,9 +2,9 @@ venues:
   map:
     Venue1:
       zones:
-        zone-count: 50
-        row-count: 30
-        col-count: 40
+        zone-count: 100
+        row-count: 26
+        col-count: 30
 
     Venue2:
       zones:
@@ -29,10 +29,3 @@ venues:
         zone-count: 30
         row-count: 50
         col-count: 60
-
-  #
-  default-config:
-    zones:
-      zone-count: 100
-      row-count: 26
-      col-count: 30
