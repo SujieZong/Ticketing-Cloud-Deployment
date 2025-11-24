@@ -217,7 +217,7 @@ jobs:
     name: Deploy to ECS
     runs-on: ubuntu-latest
     needs: [build, terraform]
-    if: always() && (needs.build.result == 'success' || needs.build.result == 'skipped') && needs.terraform.result == 'success' && (github.event.inputs.action == 'services-only' || github.event.inputs.action == 'full-deployment')
+    if: always() && (needs.build.result == 'success' || needs.build.result == 'skipped') && (needs.terraform.result == 'success' || needs.terraform.result == 'skipped') && (github.event.inputs.action == 'services-only' || github.event.inputs.action == 'full-deployment')
     steps:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4

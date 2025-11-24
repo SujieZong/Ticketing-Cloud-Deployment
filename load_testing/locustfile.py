@@ -42,6 +42,7 @@ SEAT_QUEUE = Queue()
 
 # --- Utility Functions ---
 
+
 def load_venue_layout(venue_id: str):
     """
     Loads the layout for a specific venue from the venues.yml file.
@@ -49,11 +50,13 @@ def load_venue_layout(venue_id: str):
     try:
         with open(VENUES_FILE_PATH, 'r') as f:
             venues_data = yaml.safe_load(f)
-            venue_config = venues_data.get("venues", {}).get("map", {}).get(venue_id)
+            venue_config = venues_data.get(
+                "venues", {}).get("map", {}).get(venue_id)
             if not venue_config:
-                print(f"FATAL: VenueID '{venue_id}' not found in {VENUES_FILE_PATH}")
+                print(
+                    f"FATAL: VenueID '{venue_id}' not found in {VENUES_FILE_PATH}")
                 exit(1)
-            
+
             zones_config = venue_config.get("zones")
             return {
                 "zone_count": zones_config.get("zone-count", 0),
@@ -61,7 +64,8 @@ def load_venue_layout(venue_id: str):
                 "col_count": zones_config.get("col-count", 0),
             }
     except FileNotFoundError:
-        print(f"FATAL: {VENUES_FILE_PATH} not found. Make sure you are running locust from the project root.")
+        print(
+            f"FATAL: {VENUES_FILE_PATH} not found. Make sure you are running locust from the project root.")
         exit(1)
     except Exception as e:
         print(f"FATAL: Error parsing {VENUES_FILE_PATH}: {e}")
@@ -86,8 +90,9 @@ def on_test_start(environment, **kwargs):
         return
 
     # Generate all combinations of (zone, row, column)
-    all_seats = product(range(1, zone_count + 1), range(1, row_count + 1), range(1, col_count + 1))
-    
+    all_seats = product(range(1, zone_count + 1),
+                        range(1, row_count + 1), range(1, col_count + 1))
+
     seat_count = 0
     for zone, row, col in all_seats:
         SEAT_QUEUE.put({
@@ -96,8 +101,9 @@ def on_test_start(environment, **kwargs):
             "column": str(col)
         })
         seat_count += 1
-    
-    print(f"--- Seat queue populated with {seat_count} seats for Venue '{TARGET_VENUE_ID}' ---")
+
+    print(
+        f"--- Seat queue populated with {seat_count} seats for Venue '{TARGET_VENUE_ID}' ---")
 
 
 # --- Locust User Class ---
@@ -106,8 +112,8 @@ class SequentialTicketPurchaser(HttpUser):
     """
     This user fetches a unique seat from the global queue and attempts to purchase it.
     """
-    wait_time = constant(1) # Wait 1 second between tasks
-    host = PURCHASE_HOST # Default host for the client
+    wait_time = constant(1)  # Wait 1 second between tasks
+    host = PURCHASE_HOST  # Default host for the client
 
     @task
     def purchase_ticket_sequentially(self):
@@ -124,31 +130,31 @@ class SequentialTicketPurchaser(HttpUser):
             "venueId": TARGET_VENUE_ID,
             **seat_to_purchase
         }
-        
+
         with self.client.post(
-            "/api/v1/tickets",
+            "/purchase/api/v1/tickets",
             json=request_body,
             catch_response=True,
             name="/api/v1/tickets [purchase]"
         ) as response:
             if response.status_code == 201:
                 response.success()
-                
+
                 # 50% chance to verify the ticket
                 if random.random() < 0.5:
                     ticket_id = response.json().get("ticketId")
                     if ticket_id:
                         # Make a request to the Query Service
                         self.client.get(
-                            f"{QUERY_HOST}/api/v1/tickets/{ticket_id}",
+                            f"{QUERY_HOST}/query/api/v1/tickets/{ticket_id}",
                             name="/api/v1/tickets/{ticketId} [query]"
                         )
             else:
-                response.failure(f"Failed to purchase seat {seat_to_purchase}. Status: {response.status_code}")
+                response.failure(
+                    f"Failed to purchase seat {seat_to_purchase}. Status: {response.status_code}")
 
     def on_stop(self):
         """
         Called when a user is stopped.
         """
         print("User stopped.")
-

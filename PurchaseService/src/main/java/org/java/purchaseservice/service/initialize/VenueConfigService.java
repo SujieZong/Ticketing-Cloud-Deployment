@@ -6,7 +6,7 @@ import org.java.purchaseservice.config.VenuesProperties;
 import org.java.purchaseservice.model.venue.VenueConfig;
 import org.java.purchaseservice.service.redis.RedisKeyUtil;
 import org.springframework.beans.factory.InitializingBean;
-import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
 import java.util.Map;
@@ -16,7 +16,7 @@ import java.util.Set;
 @Service
 @RequiredArgsConstructor
 public class VenueConfigService implements InitializingBean {
-	private final RedisTemplate<String, Object> redisTemplate;
+	private final StringRedisTemplate stringRedisTemplate;
 	private final VenuesProperties venuesProperties;
 
 	@Override
@@ -48,27 +48,27 @@ public class VenueConfigService implements InitializingBean {
 
 	public void initializeVenueZone(String venueId, int zoneId, int rowCount, int colCount) {
 		String rowCountKey = RedisKeyUtil.getRowCountKey(venueId, zoneId);
-		redisTemplate.opsForValue().set(rowCountKey, rowCount);
+		stringRedisTemplate.opsForValue().set(rowCountKey, String.valueOf(rowCount));
 
 		String seatPerRowKey = RedisKeyUtil.getSeatPerRowKey(venueId, zoneId);
-		redisTemplate.opsForValue().set(seatPerRowKey, colCount);
+		stringRedisTemplate.opsForValue().set(seatPerRowKey, String.valueOf(colCount));
 
 		String capacityKey = RedisKeyUtil.getZoneCapacityKey(venueId, zoneId);
-		redisTemplate.opsForValue().set(capacityKey, rowCount * colCount);
+		stringRedisTemplate.opsForValue().set(capacityKey, String.valueOf(rowCount * colCount));
 
 		String venueZonesKey = RedisKeyUtil.getZoneSetKey(venueId);
-		redisTemplate.opsForSet().add(venueZonesKey, String.valueOf(zoneId));
+		stringRedisTemplate.opsForSet().add(venueZonesKey, String.valueOf(zoneId));
 	}
 
 	public boolean isVenueExists(String venueId) {
 		String venueZonesKey = RedisKeyUtil.getZoneSetKey(venueId);
-		Boolean hasKey = redisTemplate.hasKey(venueZonesKey);
+		Boolean hasKey = stringRedisTemplate.hasKey(venueZonesKey);
 		return hasKey != null && hasKey;
 	}
 
-	public Set<Object> getVenueZones(String venueId) {
+	public Set<String> getVenueZones(String venueId) {
 		String venueZonesKey = RedisKeyUtil.getZoneSetKey(venueId);
-		return redisTemplate.opsForSet().members(venueZonesKey);
+		return stringRedisTemplate.opsForSet().members(venueZonesKey);
 	}
 
 	public int getRowCount(String venueId, int zoneId) {
@@ -87,10 +87,10 @@ public class VenueConfigService implements InitializingBean {
 	}
 
 	private int getIntValue(String key) {
-		Object value = redisTemplate.opsForValue().get(key);
+		String value = stringRedisTemplate.opsForValue().get(key);
 		if (value != null) {
 			try {
-				return Integer.parseInt(value.toString());
+				return Integer.parseInt(value);
 			} catch (NumberFormatException e) {
 				log.warn("NumberFormatException for key '{}', value '{}'", key, value);
 				return 0;
