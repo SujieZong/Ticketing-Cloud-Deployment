@@ -1,8 +1,10 @@
 locals {
-  load_balancer_dimension = regexreplace(var.alb_arn, "arn:aws:elasticloadbalancing:[^:]+:[^:]+:", "")
+  # Extract the part after the account id in ALB ARN (e.g. loadbalancer/app/..)
+  load_balancer_dimension = length(split(":", var.alb_arn)) > 5 ? element(split(":", var.alb_arn), 5) : var.alb_arn
   target_group_dimensions = {
     for name, arn in var.target_group_arns :
-    name => regexreplace(arn, "arn:aws:elasticloadbalancing:[^:]+:[^:]+:", "")
+    # use the ARN suffix (index 5) rather than regexreplace for portability
+    name => length(split(":", arn)) > 5 ? element(split(":", arn), 5) : arn
   }
 }
 
