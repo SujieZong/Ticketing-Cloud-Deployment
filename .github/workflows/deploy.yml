@@ -1,0 +1,388 @@
+name: Deploy Ticketing System
+
+on:
+  # Manual deployment trigger
+  workflow_dispatch:
+    inputs:
+      action:
+        description: "Deployment action"
+        required: true
+        type: choice
+        default: "full-deployment"
+        options:
+          - full-deployment
+          - infrastructure-only
+          - services-only
+          - destroy-infrastructure
+          - force-cleanup
+  
+  # Automatic CI/CD triggers
+  push:
+    branches:
+      - main
+      - develop
+    paths:
+      - 'PurchaseService/**'
+      - 'QueryService/**'
+      - 'RabbitCombinedConsumer/**'
+      - '.github/workflows/deploy.yml'
+  
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'PurchaseService/**'
+      - 'QueryService/**'
+      - 'RabbitCombinedConsumer/**'
+
+env:
+  AWS_REGION: us-west-2
+  TF_VERSION: 1.6.0
+
+jobs:
+  # Continuous Integration - runs on every push/PR
+  test:
+    name: Run Tests
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' || github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+      
+      - uses: actions/setup-java@v4
+        with:
+          java-version: "21"
+          distribution: "temurin"
+          cache: maven
+      
+      - name: Run Unit Tests
+        run: |
+          echo "🧪 Running tests for all services..."
+          cd PurchaseService && mvn test
+          cd ../QueryService && mvn test
+          cd ../RabbitCombinedConsumer && mvn test
+      
+      - name: Test Summary
+        if: always()
+        run: echo "✅ Test execution completed"
+
+  build:
+    name: Build Java Services
+    runs-on: ubuntu-latest
+    if: |
+      (github.event_name == 'workflow_dispatch' && 
+       (github.event.inputs.action == 'services-only' || github.event.inputs.action == 'full-deployment')) ||
+      (github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop'))
+    needs: [test]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          java-version: "21"
+          distribution: "temurin"
+          cache: maven
+      - name: Build Services
+        run: |
+          cd PurchaseService && mvn clean package -DskipTests
+          cd ../QueryService && mvn clean package -DskipTests
+          cd ../RabbitCombinedConsumer && mvn clean package -DskipTests
+      - uses: actions/upload-artifact@v4
+        with:
+          name: service-jars
+          path: |
+            PurchaseService/target/*.jar
+            QueryService/target/*.jar
+            RabbitCombinedConsumer/target/*.jar
+          retention-days: 1
+
+  force-cleanup:
+    name: Force Cleanup AWS
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'force-cleanup'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region: ${{ env.AWS_REGION }}
+      - name: Cleanup
+        run: |
+          chmod +x ./config/scripts/cleanup-aws-resources.sh
+          ./config/scripts/cleanup-aws-resources.sh
+          sleep 180
+
+  terraform:
+    name: Terraform Infrastructure
+    runs-on: ubuntu-latest
+    if: |
+      github.event_name == 'workflow_dispatch' && 
+      (github.event.inputs.action == 'infrastructure-only' || 
+       github.event.inputs.action == 'full-deployment' || 
+       github.event.inputs.action == 'destroy-infrastructure')
+    outputs:
+      alb_dns: ${{ steps.tf_out.outputs.alb_dns }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region: ${{ env.AWS_REGION }}
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+          terraform_wrapper: false
+      
+      # Setup S3 Backend for State Management
+      - name: Setup S3 Backend for Terraform State
+        run: |
+          ACCT=$(aws sts get-caller-identity --query Account --output text)
+          BUCKET="ticketing-terraform-state-${ACCT}"
+          
+          echo "🪣 Setting up S3 backend: $BUCKET"
+          
+          # Check if bucket exists
+          if aws s3api head-bucket --bucket $BUCKET 2>/dev/null; then
+            echo "✅ S3 bucket already exists"
+          else
+            echo "📦 Creating S3 bucket for Terraform state..."
+            aws s3api create-bucket \
+              --bucket $BUCKET \
+              --region ${{ env.AWS_REGION }} \
+              --create-bucket-configuration LocationConstraint=${{ env.AWS_REGION }}
+            
+            # Enable versioning for state history
+            aws s3api put-bucket-versioning \
+              --bucket $BUCKET \
+              --versioning-configuration Status=Enabled
+            
+            # Enable encryption
+            aws s3api put-bucket-encryption \
+              --bucket $BUCKET \
+              --server-side-encryption-configuration \
+              '{"Rules":[{"ApplyServerSideEncryptionByDefault":{"SSEAlgorithm":"AES256"}}]}'
+            
+            echo "✅ S3 backend configured with versioning and encryption"
+          fi
+          
+          echo "⚠️  Note: State locking disabled (AWS Learner Lab limitation)"
+      
+      - name: Create Backend Configuration
+        working-directory: ./config/terraform
+        run: |
+          ACCT=$(aws sts get-caller-identity --query Account --output text)
+          BUCKET="ticketing-terraform-state-${ACCT}"
+          
+          # Create backend.tf for S3 state storage
+          cat > backend.tf <<BACKEND
+          terraform {
+            backend "s3" {
+              bucket  = "${BUCKET}"
+              key     = "ticketing/terraform.tfstate"
+              region  = "${{ env.AWS_REGION }}"
+              encrypt = true
+              # DynamoDB locking disabled for AWS Learner Lab
+            }
+          }
+          BACKEND
+          
+          echo "✅ Backend configuration created:"
+          cat backend.tf
+      
+      - name: Create tfvars
+        working-directory: ./config/terraform
+        run: |
+          ACCT=$(aws sts get-caller-identity --query Account --output text)
+          cat > terraform.tfvars <<TFVARS
+          aws_region     = "${{ env.AWS_REGION }}"
+          aws_account_id = "$ACCT"
+          TFVARS
+      - name: Init with S3 Backend
+        working-directory: ./config/terraform
+        run: |
+          echo "🔄 Initializing Terraform with S3 backend..."
+          terraform init -upgrade -reconfigure
+          echo "✅ Terraform initialized with remote state in S3"
+      - name: Import Resources
+        if: github.event.inputs.action != 'destroy-infrastructure'
+        working-directory: ./config/terraform
+        continue-on-error: true
+        run: |
+          REGION=${{ env.AWS_REGION }}
+          imp() { 
+            echo "Importing: $1 <- $2"
+            terraform import "$1" "$2" 2>&1 | grep -v "Resource already managed" || true
+          }
+
+          imp 'module.ecr["purchase-service"].aws_ecr_repository.this' 'purchase-service'
+          imp 'module.ecr["query-service"].aws_ecr_repository.this' 'query-service'
+          imp 'module.ecr["mq-projection-service"].aws_ecr_repository.this' 'mq-projection-service'
+
+          ALB=$(aws elbv2 describe-load-balancers --region $REGION --query "LoadBalancers[?LoadBalancerName=='ticketing-alb'].LoadBalancerArn" --output text 2>/dev/null || echo "")
+          [ -n "$ALB" ] && imp 'module.shared_alb.aws_lb.shared' "$ALB"
+
+          for svc in purchase query mq-projection; do
+            TG=$(aws elbv2 describe-target-groups --region $REGION --query "TargetGroups[?TargetGroupName=='${svc}-service-tg'].TargetGroupArn" --output text 2>/dev/null || echo "")
+            [ -n "$TG" ] && imp "module.shared_alb.aws_lb_target_group.services[\"${svc}-service\"]" "$TG"
+          done
+
+          ALB_SG=$(aws ec2 describe-security-groups --region $REGION --filters "Name=group-name,Values=ticketing-alb-sg" --query "SecurityGroups[0].GroupId" --output text 2>/dev/null || echo "")
+          [ -n "$ALB_SG" ] && [ "$ALB_SG" != "None" ] && imp 'module.network.aws_security_group.alb_sg' "$ALB_SG"
+
+          ECS_SG=$(aws ec2 describe-security-groups --region $REGION --filters "Name=group-name,Values=ticketing-ecs-sg" --query "SecurityGroups[0].GroupId" --output text 2>/dev/null || echo "")
+          [ -n "$ECS_SG" ] && [ "$ECS_SG" != "None" ] && imp 'module.network.aws_security_group.this' "$ECS_SG"
+
+          RDS_SG=$(aws ec2 describe-security-groups --region $REGION --filters "Name=group-name,Values=ticketing-rds-sg" --query "SecurityGroups[0].GroupId" --output text 2>/dev/null || echo "")
+          [ -n "$RDS_SG" ] && [ "$RDS_SG" != "None" ] && imp 'module.network.aws_security_group.rds_sg' "$RDS_SG"
+
+          REDIS_SG=$(aws ec2 describe-security-groups --region $REGION --filters "Name=group-name,Values=ticketing-redis-sg" --query "SecurityGroups[0].GroupId" --output text 2>/dev/null || echo "")
+          [ -n "$REDIS_SG" ] && [ "$REDIS_SG" != "None" ] && imp 'module.elasticache.aws_security_group.redis_sg' "$REDIS_SG"
+
+          imp 'module.rds.aws_rds_cluster.this' 'ticketing-aurora'
+          imp 'module.rds.aws_rds_cluster_instance.writer' 'ticketing-aurora-writer'
+          imp 'module.rds.aws_rds_cluster_instance.readers[0]' 'ticketing-aurora-reader-1'
+          imp 'module.rds.aws_db_subnet_group.default' 'ticketing-aurora-subnet-group'
+          imp 'module.rds.aws_rds_cluster_parameter_group.this' 'ticketing-mysql-params'
+
+          imp 'module.elasticache.aws_elasticache_subnet_group.this' 'ticketing-cache-subnet-group'
+          imp 'module.elasticache.aws_elasticache_parameter_group.this' 'ticketing-redis-params'
+          imp 'module.elasticache.aws_elasticache_replication_group.this' 'ticketing-redis'
+
+          for svc in purchase query mq-projection; do
+            imp "module.logging[\"${svc}-service\"].aws_cloudwatch_log_group.this" "/ecs/${svc}-service"
+          done
+
+          imp 'module.elasticache.aws_secretsmanager_secret.redis' 'ticketing-redis-credentials'
+          imp 'module.rds.aws_secretsmanager_secret.db' 'ticketing-db-credentials'
+
+          POLICY=$(aws iam list-policies --query "Policies[?PolicyName=='ticketing-message-messaging-access'].Arn" --output text 2>/dev/null || echo "")
+          [ -n "$POLICY" ] && imp 'module.messaging.aws_iam_policy.messaging_access' "$POLICY"
+      - name: Plan
+        if: github.event.inputs.action != 'destroy-infrastructure'
+        working-directory: ./config/terraform
+        run: terraform plan -no-color
+      - name: Apply
+        if: github.event.inputs.action != 'destroy-infrastructure'
+        working-directory: ./config/terraform
+        run: |
+          echo "🚀 Applying infrastructure changes..."
+          terraform apply -auto-approve
+          echo "✅ Infrastructure deployed, state saved to S3"
+      
+      - name: Destroy
+        if: github.event.inputs.action == 'destroy-infrastructure'
+        working-directory: ./config/terraform
+        continue-on-error: true
+        run: |
+          echo "💥 Destroying infrastructure..."
+          terraform destroy -auto-approve || (chmod +x ../../config/scripts/cleanup-aws-resources.sh && ../../config/scripts/cleanup-aws-resources.sh)
+          echo "🗑️  Infrastructure destroyed, state updated in S3"
+      
+      - name: Show State Location
+        if: always()
+        run: |
+          ACCT=$(aws sts get-caller-identity --query Account --output text)
+          BUCKET="ticketing-terraform-state-${ACCT}"
+          echo "📍 Terraform state stored in:"
+          echo "   S3 Bucket: s3://${BUCKET}/ticketing/terraform.tfstate"
+          echo ""
+          echo "🔍 To verify state:"
+          echo "   aws s3 ls s3://${BUCKET}/ticketing/"
+      - name: Outputs
+        if: github.event.inputs.action != 'destroy-infrastructure'
+        id: tf_out
+        working-directory: ./config/terraform
+        run: |
+          ALB=$(terraform output -raw alb_dns_name 2>/dev/null || echo "pending")
+          echo "alb_dns=$ALB" >> $GITHUB_OUTPUT
+
+  deploy-services:
+    name: Deploy to ECS
+    runs-on: ubuntu-latest
+    needs: [build, terraform]
+    if: |
+      always() && 
+      (needs.build.result == 'success' || needs.build.result == 'skipped') && 
+      (needs.terraform.result == 'success' || needs.terraform.result == 'skipped') &&
+      (
+        (github.event_name == 'workflow_dispatch' && 
+         (github.event.inputs.action == 'services-only' || github.event.inputs.action == 'full-deployment')) ||
+        (github.event_name == 'push' && github.ref == 'refs/heads/develop') ||
+        (github.event_name == 'push' && github.ref == 'refs/heads/main')
+      )
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        if: needs.build.result == 'success'
+        with:
+          name: service-jars
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region: ${{ env.AWS_REGION }}
+      - uses: aws-actions/amazon-ecr-login@v2
+        id: ecr
+      - uses: docker/setup-buildx-action@v3
+      
+      - name: Determine Environment
+        id: env
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "env=manual" >> $GITHUB_OUTPUT
+          elif [ "${{ github.ref }}" = "refs/heads/main" ]; then
+            echo "env=production" >> $GITHUB_OUTPUT
+          elif [ "${{ github.ref }}" = "refs/heads/develop" ]; then
+            echo "env=staging" >> $GITHUB_OUTPUT
+          fi
+      
+      - name: Build & Push
+        env:
+          ECR: ${{ steps.ecr.outputs.registry }}
+          TAG: ${{ github.sha }}
+          ENV_TAG: ${{ steps.env.outputs.env }}
+        run: |
+          echo "🚀 Building and pushing Docker images..."
+          echo "Environment: $ENV_TAG"
+          echo "Commit: $TAG"
+          
+          docker buildx build --platform linux/amd64 --push \
+            -t $ECR/purchase-service:$TAG \
+            -t $ECR/purchase-service:$ENV_TAG \
+            -t $ECR/purchase-service:latest \
+            ./PurchaseService
+          
+          docker buildx build --platform linux/amd64 --push \
+            -t $ECR/query-service:$TAG \
+            -t $ECR/query-service:$ENV_TAG \
+            -t $ECR/query-service:latest \
+            ./QueryService
+          
+          docker buildx build --platform linux/amd64 --push \
+            -t $ECR/mq-projection-service:$TAG \
+            -t $ECR/mq-projection-service:$ENV_TAG \
+            -t $ECR/mq-projection-service:latest \
+            ./RabbitCombinedConsumer
+      
+      - name: Update ECS
+        run: |
+          echo "♻️  Updating ECS services..."
+          for svc in purchase query mq-projection; do
+            aws ecs update-service \
+              --cluster ${svc}-service-cluster \
+              --service ${svc}-service \
+              --force-new-deployment \
+              --region ${{ env.AWS_REGION }} 2>&1 || true
+          done
+          sleep 120
+      
+      - name: Deployment Summary
+        run: |
+          echo "✅ Deployment completed!"
+          echo "Event: ${{ github.event_name }}"
+          echo "Branch: ${{ github.ref }}"
+          echo "Environment: ${{ steps.env.outputs.env }}"
+          echo "Commit: ${{ github.sha }}"
