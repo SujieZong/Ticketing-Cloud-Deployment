@@ -43,6 +43,7 @@ chmod +x setup-s3-backend.sh
 ```
 
 Expected output:
+
 ```
 ✅ S3 bucket created: ticketing-terraform-state-{account-id}
 ✅ Versioning enabled
@@ -58,6 +59,7 @@ Expected output:
 5. Click "Run workflow"
 
 Wait ~20-30 minutes. You'll see:
+
 1. ✅ Build services
 2. ✅ Terraform infrastructure
 3. ✅ Deploy to ECS
@@ -78,6 +80,7 @@ curl http://{ALB-DNS}/api/events
 ## 🔄 Daily Usage
 
 ### Scenario A: Code Change → Staging
+
 ```bash
 git checkout develop
 # ...make changes...
@@ -87,6 +90,7 @@ git push origin develop
 ```
 
 ### Scenario B: Code Change → Production
+
 ```bash
 git checkout main
 git merge develop
@@ -95,6 +99,7 @@ git push origin main
 ```
 
 ### Scenario C: Quick Bug Fix
+
 ```bash
 # ...fix bug in code...
 git commit -am "Fix null pointer"
@@ -107,6 +112,7 @@ git push origin main
 ## ⚠️ Learner Lab Reminders
 
 ### Every 4 Hours: Update Credentials
+
 ```bash
 # Learner Lab credentials expire every 4 hours!
 # Update GitHub Secrets before each deployment:
@@ -115,6 +121,7 @@ git push origin main
 ```
 
 ### When Lab Ends: Data is Lost
+
 ```bash
 # On next lab session, redeploy everything:
 GitHub Actions → full-deployment
@@ -123,21 +130,25 @@ GitHub Actions → full-deployment
 ## 🎯 Common Commands
 
 ### Check Deployment Status
+
 ```bash
 gh run list --limit 5
 ```
 
 ### View Workflow Logs
+
 ```bash
 gh run view --log
 ```
 
 ### Verify S3 State
+
 ```bash
 aws s3 ls s3://ticketing-terraform-state-$(aws sts get-caller-identity --query Account --output text)/ticketing/
 ```
 
 ### Force Redeploy Service
+
 ```bash
 aws ecs update-service \
   --cluster purchase-service-cluster \
@@ -149,15 +160,19 @@ aws ecs update-service \
 ## 🆘 Troubleshooting
 
 ### Error: "ExpiredToken"
+
 **Solution**: Update GitHub Secrets with fresh credentials
 
 ### Error: "AccessDenied"
+
 **Solution**: Make sure you're using LabRole (not other roles)
 
 ### Error: "Bucket does not exist"
+
 **Solution**: Run `setup-s3-backend.sh` again
 
 ### Deployment Stuck
+
 **Solution**: Check workflow logs with `gh run view --log`
 
 ## ✅ Success Checklist

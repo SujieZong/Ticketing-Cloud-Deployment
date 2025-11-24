@@ -15,25 +15,25 @@ on:
           - services-only
           - destroy-infrastructure
           - force-cleanup
-  
+
   # Automatic CI/CD triggers
   push:
     branches:
       - main
       - develop
     paths:
-      - 'PurchaseService/**'
-      - 'QueryService/**'
-      - 'RabbitCombinedConsumer/**'
-      - '.github/workflows/deploy.yml'
-  
+      - "PurchaseService/**"
+      - "QueryService/**"
+      - "RabbitCombinedConsumer/**"
+      - ".github/workflows/deploy.yml"
+
   pull_request:
     branches:
       - main
     paths:
-      - 'PurchaseService/**'
-      - 'QueryService/**'
-      - 'RabbitCombinedConsumer/**'
+      - "PurchaseService/**"
+      - "QueryService/**"
+      - "RabbitCombinedConsumer/**"
 
 env:
   AWS_REGION: us-west-2
@@ -47,20 +47,20 @@ jobs:
     if: github.event_name == 'push' || github.event_name == 'pull_request'
     steps:
       - uses: actions/checkout@v4
-      
+
       - uses: actions/setup-java@v4
         with:
           java-version: "21"
           distribution: "temurin"
           cache: maven
-      
+
       - name: Run Unit Tests
         run: |
           echo "🧪 Running tests for all services..."
           cd PurchaseService && mvn test
           cd ../QueryService && mvn test
           cd ../RabbitCombinedConsumer && mvn test
-      
+
       - name: Test Summary
         if: always()
         run: echo "✅ Test execution completed"
@@ -134,15 +134,15 @@ jobs:
         with:
           terraform_version: ${{ env.TF_VERSION }}
           terraform_wrapper: false
-      
+
       # Setup S3 Backend for State Management
       - name: Setup S3 Backend for Terraform State
         run: |
           ACCT=$(aws sts get-caller-identity --query Account --output text)
           BUCKET="ticketing-terraform-state-${ACCT}"
-          
+
           echo "🪣 Setting up S3 backend: $BUCKET"
-          
+
           # Check if bucket exists
           if aws s3api head-bucket --bucket $BUCKET 2>/dev/null; then
             echo "✅ S3 bucket already exists"
@@ -166,15 +166,15 @@ jobs:
             
             echo "✅ S3 backend configured with versioning and encryption"
           fi
-          
+
           echo "⚠️  Note: State locking disabled (AWS Learner Lab limitation)"
-      
+
       - name: Create Backend Configuration
         working-directory: ./config/terraform
         run: |
           ACCT=$(aws sts get-caller-identity --query Account --output text)
           BUCKET="ticketing-terraform-state-${ACCT}"
-          
+
           # Create backend.tf for S3 state storage
           cat > backend.tf <<BACKEND
           terraform {
@@ -187,10 +187,10 @@ jobs:
             }
           }
           BACKEND
-          
+
           echo "✅ Backend configuration created:"
           cat backend.tf
-      
+
       - name: Create tfvars
         working-directory: ./config/terraform
         run: |
@@ -270,7 +270,7 @@ jobs:
           echo "🚀 Applying infrastructure changes..."
           terraform apply -auto-approve
           echo "✅ Infrastructure deployed, state saved to S3"
-      
+
       - name: Destroy
         if: github.event.inputs.action == 'destroy-infrastructure'
         working-directory: ./config/terraform
@@ -279,7 +279,7 @@ jobs:
           echo "💥 Destroying infrastructure..."
           terraform destroy -auto-approve || (chmod +x ../../config/scripts/cleanup-aws-resources.sh && ../../config/scripts/cleanup-aws-resources.sh)
           echo "🗑️  Infrastructure destroyed, state updated in S3"
-      
+
       - name: Show State Location
         if: always()
         run: |
@@ -327,7 +327,7 @@ jobs:
       - uses: aws-actions/amazon-ecr-login@v2
         id: ecr
       - uses: docker/setup-buildx-action@v3
-      
+
       - name: Determine Environment
         id: env
         run: |
@@ -338,7 +338,7 @@ jobs:
           elif [ "${{ github.ref }}" = "refs/heads/develop" ]; then
             echo "env=staging" >> $GITHUB_OUTPUT
           fi
-      
+
       - name: Build & Push
         env:
           ECR: ${{ steps.ecr.outputs.registry }}
@@ -348,25 +348,25 @@ jobs:
           echo "🚀 Building and pushing Docker images..."
           echo "Environment: $ENV_TAG"
           echo "Commit: $TAG"
-          
+
           docker buildx build --platform linux/amd64 --push \
             -t $ECR/purchase-service:$TAG \
             -t $ECR/purchase-service:$ENV_TAG \
             -t $ECR/purchase-service:latest \
             ./PurchaseService
-          
+
           docker buildx build --platform linux/amd64 --push \
             -t $ECR/query-service:$TAG \
             -t $ECR/query-service:$ENV_TAG \
             -t $ECR/query-service:latest \
             ./QueryService
-          
+
           docker buildx build --platform linux/amd64 --push \
             -t $ECR/mq-projection-service:$TAG \
             -t $ECR/mq-projection-service:$ENV_TAG \
             -t $ECR/mq-projection-service:latest \
             ./RabbitCombinedConsumer
-      
+
       - name: Update ECS
         run: |
           echo "♻️  Updating ECS services..."
@@ -378,7 +378,7 @@ jobs:
               --region ${{ env.AWS_REGION }} 2>&1 || true
           done
           sleep 120
-      
+
       - name: Deployment Summary
         run: |
           echo "✅ Deployment completed!"

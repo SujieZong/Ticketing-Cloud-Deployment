@@ -5,6 +5,7 @@ This guide demonstrates the complete CI/CD workflow for the Ticketing System usi
 ## 🎯 Overview
 
 This CI/CD pipeline includes:
+
 - ✅ **Automated Testing** on every push/PR
 - 🚀 **Automated Deployment** to staging (develop) and production (main)
 - 🎛️ **Manual Control** for infrastructure changes
@@ -14,6 +15,7 @@ This CI/CD pipeline includes:
 ## 📋 Prerequisites
 
 ### 1. AWS Learner Lab Setup
+
 - Active AWS Learner Lab session
 - Valid credentials (automatically refreshed every 4 hours)
 - LabRole with necessary permissions
@@ -23,6 +25,7 @@ This CI/CD pipeline includes:
 Go to your GitHub repository → Settings → Secrets and variables → Actions
 
 Add these secrets:
+
 ```
 AWS_ACCESS_KEY_ID       = <from AWS Learner Lab>
 AWS_SECRET_ACCESS_KEY   = <from AWS Learner Lab>
@@ -42,6 +45,7 @@ chmod +x setup-s3-backend.sh
 ```
 
 This creates:
+
 - S3 bucket: `ticketing-terraform-state-{account-id}`
 - Versioning enabled (state history)
 - Encryption enabled (AES256)
@@ -72,6 +76,7 @@ git push origin feature/new-ticket-validation
 ```
 
 **What happens automatically:**
+
 1. GitHub Actions triggers on PR creation
 2. `test` job runs all unit tests
 3. Results show in PR (✅ or ❌)
@@ -93,6 +98,7 @@ git push origin develop
 ```
 
 **What happens automatically:**
+
 1. ✅ Run all tests
 2. 🏗️ Build Java services (Maven)
 3. 📦 Build Docker images
@@ -104,6 +110,7 @@ git push origin develop
 **Timeline**: ~5-10 minutes
 
 **Verification**:
+
 ```bash
 # Check workflow status
 gh run list --branch develop
@@ -134,6 +141,7 @@ git push origin main
 ```
 
 **What happens automatically:**
+
 1. ✅ Run all tests
 2. 🏗️ Build Java services
 3. 📦 Build Docker images
@@ -161,6 +169,7 @@ git push origin main
 ```
 
 **Manual deployment required**:
+
 1. Go to GitHub Actions
 2. Click "Deploy Ticketing System"
 3. Click "Run workflow"
@@ -168,6 +177,7 @@ git push origin main
 5. Click "Run workflow"
 
 **What happens:**
+
 1. 📍 Read state from S3
 2. 🔄 Terraform plan (show changes)
 3. ✅ Terraform apply (update infrastructure)
@@ -183,6 +193,7 @@ git push origin main
 **Goal**: Update only application code, keep infrastructure unchanged
 
 **Use when:**
+
 - Bug fix in Java code
 - Configuration change in `application.yml`
 - Dependency update in `pom.xml`
@@ -198,11 +209,13 @@ git push origin main
 ```
 
 **Manual deployment**:
+
 1. Go to GitHub Actions
 2. Select: **`services-only`**
 3. Run workflow
 
 **What happens:**
+
 1. 🏗️ Build services
 2. 📦 Build Docker images
 3. ⬆️ Push to ECR
@@ -219,6 +232,7 @@ git push origin main
 **Goal**: Deploy everything (infrastructure + services)
 
 **Use when:**
+
 - First-time deployment
 - Major version upgrade
 - Combined infrastructure and code changes
@@ -228,6 +242,7 @@ git push origin main
 3. Run workflow
 
 **What happens:**
+
 1. 🏗️ Build services
 2. 🏗️ Terraform apply (infrastructure)
 3. 📦 Build Docker images
@@ -250,6 +265,7 @@ git push origin main
 3. Run workflow
 
 **What happens:**
+
 1. 📍 Read state from S3
 2. 💥 Terraform destroy (delete all resources)
 3. 💾 Update state in S3 (empty state)
@@ -266,6 +282,7 @@ git push origin main
 3. Run workflow
 
 **What happens:**
+
 1. 🧹 Run `cleanup-aws-resources.sh`
 2. 🗑️ Delete ECS clusters
 3. 🗑️ Delete ALB
@@ -307,6 +324,7 @@ Is it infrastructure code (Terraform)?
 ## 🔍 Monitoring & Verification
 
 ### Check Workflow Status
+
 ```bash
 # List recent workflows
 gh run list
@@ -319,6 +337,7 @@ gh run view <run-id> --log
 ```
 
 ### Check S3 State
+
 ```bash
 # List state files
 aws s3 ls s3://ticketing-terraform-state-{account-id}/ticketing/
@@ -333,6 +352,7 @@ aws s3api list-object-versions \
 ```
 
 ### Check Deployed Services
+
 ```bash
 # ECS service status
 aws ecs describe-services \
@@ -351,6 +371,7 @@ curl http://{ALB-DNS}/api/health
 ```
 
 ### View Logs
+
 ```bash
 # ECS task logs
 aws logs tail /ecs/purchase-service --follow
@@ -364,6 +385,7 @@ aws logs filter-log-events \
 ## 🎓 AWS Learner Lab Limitations
 
 ### What Works ✅
+
 - S3 bucket for state (created automatically)
 - S3 versioning (state history)
 - Automated CI/CD triggers
@@ -371,6 +393,7 @@ aws logs filter-log-events \
 - ECR image storage
 
 ### What Doesn't Work ❌
+
 - **DynamoDB state locking**: Not available in Learner Lab
   - **Impact**: Concurrent deployments may conflict
   - **Solution**: Run one deployment at a time
@@ -379,6 +402,7 @@ aws logs filter-log-events \
   - **Solution**: Use `import` step in workflow
 
 ### Session Management
+
 ```bash
 # Update GitHub Secrets every 4 hours
 # Learner Lab → AWS Details → Show
@@ -391,6 +415,7 @@ AWS_SESSION_TOKEN=...
 ## 🚨 Troubleshooting
 
 ### Problem: Tests fail on PR
+
 ```bash
 # Run tests locally
 cd PurchaseService
@@ -402,6 +427,7 @@ git push
 ```
 
 ### Problem: Deployment fails
+
 ```bash
 # Check workflow logs
 gh run view <run-id> --log
@@ -414,6 +440,7 @@ aws s3 ls s3://ticketing-terraform-state-{account-id}/
 ```
 
 ### Problem: State conflict
+
 ```bash
 # Manually sync state
 cd config/terraform
@@ -423,6 +450,7 @@ terraform state push terraform.tfstate
 ```
 
 ### Problem: ECS service won't update
+
 ```bash
 # Force new deployment
 aws ecs update-service \
@@ -435,21 +463,25 @@ aws ecs update-service \
 ## 📈 Best Practices
 
 1. **Always test on develop first**
+
    - Push to develop → auto-deploy to staging
    - Test thoroughly
    - Then merge to main → auto-deploy to production
 
 2. **Keep infrastructure changes separate**
+
    - Use manual `infrastructure-only` trigger
    - Review Terraform plan carefully
    - Infrastructure changes are slow (15-20 min)
 
 3. **Use services-only for quick updates**
+
    - Bug fixes, code changes
    - Much faster (5-7 min)
    - No infrastructure risk
 
 4. **Monitor S3 state regularly**
+
    - Verify state exists before large changes
    - Use versioning to rollback if needed
 
@@ -461,6 +493,7 @@ aws ecs update-service \
 ## 🎉 Summary
 
 You now have a **production-grade CI/CD pipeline** with:
+
 - ✅ Automated testing on every PR
 - 🚀 Automated deployments (staging & production)
 - 📦 Persistent state management (S3)
