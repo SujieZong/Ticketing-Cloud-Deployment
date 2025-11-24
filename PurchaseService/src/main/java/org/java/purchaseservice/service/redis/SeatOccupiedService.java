@@ -19,13 +19,13 @@ public class SeatOccupiedService {
 
 	public void initializeAllZonesForEvent(String eventId, String venueId) {
 		//
-		Set<Object> zoneIds = venueConfigService.getVenueZones(venueId);
+		Set<String> zoneIds = venueConfigService.getVenueZones(venueId);
 		if (zoneIds == null || zoneIds.isEmpty()) {
 			throw new IllegalStateException("Venue " + venueId + " has no configured zones.");
 		}
 
-		for (Object z : zoneIds) {
-			int zoneId = Integer.parseInt(z.toString());
+		for (String z : zoneIds) {
+			int zoneId = Integer.parseInt(z);
 			initializeEventSeat(eventId, venueId, zoneId);
 		}
 	}
