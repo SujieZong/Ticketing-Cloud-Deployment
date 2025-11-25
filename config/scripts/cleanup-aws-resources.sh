@@ -39,6 +39,18 @@ done
 
 sleep 15
 
+# Delete ECS Task Definitions (deregister)
+echo "Deregistering ECS task definitions..."
+for task_family in purchase-service-task query-service-task mq-projection-service-task; do
+  TASK_ARNS=$(aws ecs list-task-definitions --family-prefix $task_family --region $REGION --query "taskDefinitionArns[]" --output text 2>/dev/null || echo "")
+  if [ ! -z "$TASK_ARNS" ]; then
+    for TASK_ARN in $TASK_ARNS; do
+      echo "  Deregistering task: $TASK_ARN"
+      aws ecs deregister-task-definition --task-definition $TASK_ARN --region $REGION 2>/dev/null || true
+    done
+  fi
+done
+
 # Delete ECS clusters
 echo "Deleting ECS clusters..."
 aws ecs delete-cluster --cluster ticketing-prod-cluster --region $REGION 2>/dev/null || true
@@ -73,11 +85,27 @@ for i in {1..30}; do
   sleep 5
 done
 
-# Delete ALB
-echo "Deleting Application Load Balancer..."
+# Delete ALB Listener Rules
+echo "Deleting ALB listener rules..."
 ALB_ARN=$(aws elbv2 describe-load-balancers --region $REGION --query "LoadBalancers[?contains(LoadBalancerName, 'ticketing')].LoadBalancerArn" --output text 2>/dev/null || echo "")
 if [ ! -z "$ALB_ARN" ]; then
+  LISTENER_ARN=$(aws elbv2 describe-listeners --load-balancer-arn $ALB_ARN --region $REGION --query "Listeners[0].ListenerArn" --output text 2>/dev/null || echo "")
+  if [ ! -z "$LISTENER_ARN" ] && [ "$LISTENER_ARN" != "None" ]; then
+    RULE_ARNS=$(aws elbv2 describe-rules --listener-arn $LISTENER_ARN --region $REGION --query "Rules[?Priority!='default'].RuleArn" --output text 2>/dev/null || echo "")
+    if [ ! -z "$RULE_ARNS" ]; then
+      for RULE_ARN in $RULE_ARNS; do
+        echo "  Deleting listener rule: $RULE_ARN"
+        aws elbv2 delete-rule --rule-arn $RULE_ARN --region $REGION 2>/dev/null || true
+      done
+    fi
+  fi
+fi
+
+# Delete ALB
+echo "Deleting Application Load Balancer..."
+if [ ! -z "$ALB_ARN" ] && [ "$ALB_ARN" != "None" ]; then
   aws elbv2 delete-load-balancer --load-balancer-arn $ALB_ARN --region $REGION 2>/dev/null || true
+  sleep 10
 fi
 
 # Delete CloudWatch Log Groups
@@ -90,6 +118,18 @@ aws logs delete-log-group --log-group-name /ecs/mq-projection-service --region $
 echo "Deleting Secrets Manager secrets..."
 aws secretsmanager delete-secret --secret-id ticketing-redis-credentials --force-delete-without-recovery --region $REGION 2>/dev/null || true
 aws secretsmanager delete-secret --secret-id ticketing-db-credentials --force-delete-without-recovery --region $REGION 2>/dev/null || true
+
+# Delete RDS Instances first (required before cluster deletion)
+echo "Deleting RDS cluster instances..."
+RDS_INSTANCES=$(aws rds describe-db-instances --region $REGION --query "DBInstances[?DBClusterIdentifier=='ticketing-aurora'].DBInstanceIdentifier" --output text 2>/dev/null || echo "")
+if [ ! -z "$RDS_INSTANCES" ]; then
+  for INSTANCE in $RDS_INSTANCES; do
+    echo "  Deleting RDS instance: $INSTANCE"
+    aws rds delete-db-instance --db-instance-identifier $INSTANCE --skip-final-snapshot --region $REGION 2>/dev/null || true
+  done
+  echo "Waiting for RDS instances to be deleted..."
+  sleep 60
+fi
 
 # Delete RDS Cluster (if exists)
 echo "Deleting RDS cluster..."
@@ -126,9 +166,15 @@ for i in {1..30}; do
   sleep 10
 done
 
-# Delete ElastiCache cluster
-echo "Deleting ElastiCache cluster..."
+# Delete ElastiCache Replication Group (replaces single cluster)
+echo "Deleting ElastiCache replication group..."
+aws elasticache delete-replication-group --replication-group-id ticketing-redis --region $REGION 2>/dev/null || true
+
+# Also try deleting as single cluster (fallback for older deployments)
+echo "Deleting ElastiCache cluster (fallback)..."
 aws elasticache delete-cache-cluster --cache-cluster-id ticketing-redis --region $REGION 2>/dev/null || true
+
+sleep 20
 
 # Delete ElastiCache Subnet Group
 echo "Deleting ElastiCache subnet group..."
@@ -161,6 +207,19 @@ for i in {1..30}; do
   sleep 10
 done
 
+# Delete SNS and SQS resources
+echo "Deleting SNS topic..."
+SNS_TOPIC_ARN=$(aws sns list-topics --region $REGION --query "Topics[?contains(TopicArn, 'ticket-events')].TopicArn" --output text 2>/dev/null || echo "")
+if [ ! -z "$SNS_TOPIC_ARN" ]; then
+  aws sns delete-topic --topic-arn $SNS_TOPIC_ARN --region $REGION 2>/dev/null || true
+fi
+
+echo "Deleting SQS queue..."
+SQS_QUEUE_URL=$(aws sqs list-queues --region $REGION --query "QueueUrls[?contains(@, 'ticket-sql')]" --output text 2>/dev/null || echo "")
+if [ ! -z "$SQS_QUEUE_URL" ]; then
+  aws sqs delete-queue --queue-url $SQS_QUEUE_URL --region $REGION 2>/dev/null || true
+fi
+
 # Delete IAM Policy
 echo "Deleting IAM policy..."
 POLICY_ARN=$(aws iam list-policies --query "Policies[?PolicyName=='ticketing-message-messaging-access'].Arn" --output text 2>/dev/null || echo "")
@@ -173,9 +232,10 @@ echo "Waiting 60s for resources to fully delete before removing security groups.
 sleep 60
 
 echo "Deleting security groups..."
-for sg_name in ticketing-alb-sg ticketing-ecs-sg ticketing-rds-sg; do
+for sg_name in ticketing-alb-sg ticketing-ecs-sg ticketing-rds-sg ticketing-redis-sg; do
   SG_ID=$(aws ec2 describe-security-groups --region $REGION --filters "Name=group-name,Values=$sg_name" --query "SecurityGroups[0].GroupId" --output text 2>/dev/null || echo "")
   if [ ! -z "$SG_ID" ] && [ "$SG_ID" != "None" ]; then
+    echo "  Deleting security group: $sg_name ($SG_ID)"
     aws ec2 delete-security-group --group-id $SG_ID --region $REGION 2>/dev/null || true
   fi
 done
