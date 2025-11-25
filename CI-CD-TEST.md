@@ -70,7 +70,7 @@ gh run view --log
 
 ```bash
 # 1. Switch to staging branch
-git checkout Sujie-staging
+git checkout staging
 
 # 2. Make a code change
 vim PurchaseService/src/main/resources/application.yml
@@ -79,7 +79,7 @@ vim PurchaseService/src/main/resources/application.yml
 # 3. Commit and push
 git add .
 git commit -m "test: Update staging config"
-git push origin Sujie-staging
+git push origin staging
 
 # 🤖 AUTOMATIC DEPLOYMENT SHOULD START
 ```
@@ -119,7 +119,7 @@ aws ecr describe-images \
 git checkout Sujie-CI/CD
 
 # 2. Merge staging (simulating promotion)
-git merge Sujie-staging
+git merge staging
 
 # 3. Push to production
 git push origin Sujie-CI/CD
@@ -320,7 +320,7 @@ After testing, you should see:
 - Test results show in PR
 
 ✅ **Automated Deployment:**
-- Push to `Sujie-staging` → auto-deploy
+- Push to `staging` → auto-deploy
 - Push to `Sujie-CI/CD` → auto-deploy to production
 
 ✅ **Manual Control:**
@@ -354,6 +354,6 @@ After testing, you should see:
 
 3. **Update workflow for production:**
    - Change `Sujie-CI/CD` → `main`
-   - Change `Sujie-staging` → `develop`
+   - Change `staging` → `develop`
 
 Happy testing! 🚀

@@ -28,7 +28,7 @@ class TicketPurchaseServiceTest {
 
 		TicketPurchaseService svc = new TicketPurchaseService(seat, ticketMapper, messagePublisher);
 
-		// request
+		// request DTO
 		var req = new TicketPurchaseRequestDTO("V1", "E1", 1, "A", "7");
 
 		// mapper: CreationDTO -> entity；entity -> respondDTO
