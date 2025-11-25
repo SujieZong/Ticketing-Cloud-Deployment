@@ -368,10 +368,16 @@ jobs:
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             echo "env=manual" >> $GITHUB_OUTPUT
+          elif [ "${{ github.ref }}" = "refs/heads/Sujie-CI/CD" ]; then
+            echo "env=production" >> $GITHUB_OUTPUT
+          elif [ "${{ github.ref }}" = "refs/heads/staging" ]; then
+            echo "env=staging" >> $GITHUB_OUTPUT
           elif [ "${{ github.ref }}" = "refs/heads/main" ]; then
             echo "env=production" >> $GITHUB_OUTPUT
           elif [ "${{ github.ref }}" = "refs/heads/develop" ]; then
             echo "env=staging" >> $GITHUB_OUTPUT
+          else
+            echo "env=branch-$(echo ${{ github.ref }} | sed 's/refs\/heads\///' | sed 's/\//-/g')" >> $GITHUB_OUTPUT
           fi
 
       - name: Build & Push
