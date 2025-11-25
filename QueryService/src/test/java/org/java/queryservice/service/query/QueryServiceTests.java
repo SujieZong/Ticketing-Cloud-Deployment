@@ -108,7 +108,7 @@ class QueryServiceTests {
 		@Test
 		@DisplayName("should return ZERO when repository returns null")
 		void revenue_nullToZero() {
-			// given
+			// given 
 			String venueId = "V-1";
 			String eventId = "E-1";
 			when(ticketInfoRepository.sumRevenueByVenueAndEvent(venueId, eventId)).thenReturn(null);
