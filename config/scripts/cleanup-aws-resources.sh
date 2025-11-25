@@ -14,39 +14,62 @@ aws ecr delete-repository --repository-name mq-projection-service --region $REGI
 
 # Delete ECS services (must be done before cluster)
 echo "Deleting ECS services..."
-aws ecs update-service --cluster ticketing-prod-cluster --service ticketing-purchase-service --desired-count 0 --region $REGION 2>/dev/null || true
-aws ecs update-service --cluster ticketing-prod-cluster --service ticketing-query-service --desired-count 0 --region $REGION 2>/dev/null || true
-aws ecs update-service --cluster ticketing-prod-cluster --service ticketing-mq-projection-service --desired-count 0 --region $REGION 2>/dev/null || true
+
+# Old cluster names (if they exist)
+for service in ticketing-purchase-service ticketing-query-service ticketing-mq-projection-service; do
+  aws ecs update-service --cluster ticketing-prod-cluster --service $service --desired-count 0 --region $REGION 2>/dev/null || true
+done
 
 sleep 10
 
-aws ecs delete-service --cluster ticketing-prod-cluster --service ticketing-purchase-service --region $REGION --force 2>/dev/null || true
-aws ecs delete-service --cluster ticketing-prod-cluster --service ticketing-query-service --region $REGION --force 2>/dev/null || true
-aws ecs delete-service --cluster ticketing-prod-cluster --service ticketing-mq-projection-service --region $REGION --force 2>/dev/null || true
+for service in ticketing-purchase-service ticketing-query-service ticketing-mq-projection-service; do
+  aws ecs delete-service --cluster ticketing-prod-cluster --service $service --region $REGION --force 2>/dev/null || true
+done
 
-# Delete ECS cluster
-echo "Deleting ECS cluster..."
+# New cluster names (current config)
+for cluster_service in "purchase-service-cluster:purchase-service" "query-service-cluster:query-service" "mq-projection-service-cluster:mq-projection-service"; do
+  CLUSTER=$(echo $cluster_service | cut -d: -f1)
+  SERVICE=$(echo $cluster_service | cut -d: -f2)
+  
+  echo "  Deleting service $SERVICE from cluster $CLUSTER..."
+  aws ecs update-service --cluster $CLUSTER --service $SERVICE --desired-count 0 --region $REGION 2>/dev/null || true
+  sleep 5
+  aws ecs delete-service --cluster $CLUSTER --service $SERVICE --region $REGION --force 2>/dev/null || true
+done
+
+sleep 15
+
+# Delete ECS clusters
+echo "Deleting ECS clusters..."
 aws ecs delete-cluster --cluster ticketing-prod-cluster --region $REGION 2>/dev/null || true
+aws ecs delete-cluster --cluster purchase-service-cluster --region $REGION 2>/dev/null || true
+aws ecs delete-cluster --cluster query-service-cluster --region $REGION 2>/dev/null || true
+aws ecs delete-cluster --cluster mq-projection-service-cluster --region $REGION 2>/dev/null || true
 
 # Delete ALB Target Groups
 echo "Deleting ALB target groups..."
-for tg in purchase-service-tg query-service-tg mq-projection-service-tg; do
-  TG_ARN=$(aws elbv2 describe-target-groups --region $REGION --query "TargetGroups[?TargetGroupName=='$tg'].TargetGroupArn" --output text 2>/dev/null || echo "")
-  if [ ! -z "$TG_ARN" ] && [ "$TG_ARN" != "None" ]; then
-    echo "  Deleting target group: $tg"
+TARGET_GROUPS=$(aws elbv2 describe-target-groups --region $REGION --query "TargetGroups[?contains(TargetGroupName, '-service-tg')].TargetGroupArn" --output text 2>/dev/null || echo "")
+
+if [ -n "$TARGET_GROUPS" ]; then
+  for TG_ARN in $TARGET_GROUPS; do
+    TG_NAME=$(aws elbv2 describe-target-groups --target-group-arns $TG_ARN --region $REGION --query "TargetGroups[0].TargetGroupName" --output text 2>/dev/null || echo "")
+    echo "  Deleting target group: $TG_NAME ($TG_ARN)"
     aws elbv2 delete-target-group --target-group-arn $TG_ARN --region $REGION 2>/dev/null || true
-  fi
-done
+    sleep 2
+  done
+else
+  echo "  No target groups found to delete"
+fi
 
 # Wait for target groups to be fully deleted
 echo "Waiting for target groups to be fully deleted..."
-for i in {1..20}; do
-  REMAINING_TGS=$(aws elbv2 describe-target-groups --region $REGION --query "TargetGroups[?contains(TargetGroupName, 'service-tg')].TargetGroupName" --output text 2>/dev/null || echo "")
-  if [ -z "$REMAINING_TGS" ]; then
+for i in {1..30}; do
+  REMAINING=$(aws elbv2 describe-target-groups --region $REGION --query "TargetGroups[?contains(TargetGroupName, '-service-tg')].TargetGroupName" --output text 2>/dev/null || echo "")
+  if [ -z "$REMAINING" ]; then
     echo "✅ All target groups deleted"
     break
   fi
-  echo "⏳ Still deleting target groups... ($i/20)"
+  echo "⏳ Still deleting target groups... ($i/30)"
   sleep 5
 done
 
