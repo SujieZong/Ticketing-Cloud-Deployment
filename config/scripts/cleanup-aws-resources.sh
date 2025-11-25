@@ -32,9 +32,22 @@ aws ecs delete-cluster --cluster ticketing-prod-cluster --region $REGION 2>/dev/
 echo "Deleting ALB target groups..."
 for tg in purchase-service-tg query-service-tg mq-projection-service-tg; do
   TG_ARN=$(aws elbv2 describe-target-groups --region $REGION --query "TargetGroups[?TargetGroupName=='$tg'].TargetGroupArn" --output text 2>/dev/null || echo "")
-  if [ ! -z "$TG_ARN" ]; then
+  if [ ! -z "$TG_ARN" ] && [ "$TG_ARN" != "None" ]; then
+    echo "  Deleting target group: $tg"
     aws elbv2 delete-target-group --target-group-arn $TG_ARN --region $REGION 2>/dev/null || true
   fi
+done
+
+# Wait for target groups to be fully deleted
+echo "Waiting for target groups to be fully deleted..."
+for i in {1..20}; do
+  REMAINING_TGS=$(aws elbv2 describe-target-groups --region $REGION --query "TargetGroups[?contains(TargetGroupName, 'service-tg')].TargetGroupName" --output text 2>/dev/null || echo "")
+  if [ -z "$REMAINING_TGS" ]; then
+    echo "✅ All target groups deleted"
+    break
+  fi
+  echo "⏳ Still deleting target groups... ($i/20)"
+  sleep 5
 done
 
 # Delete ALB
