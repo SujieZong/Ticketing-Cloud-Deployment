@@ -57,10 +57,10 @@ jobs:
           cache: maven
 
       - name: Run Unit Tests
-        continue-on-error: true  # Don't fail if no tests
+        continue-on-error: true # Don't fail if no tests
         run: |
           echo "🧪 Running tests for all services..."
-          
+
           # PurchaseService
           if [ -d "PurchaseService/src/test" ]; then
             echo "Testing PurchaseService..."
@@ -69,7 +69,7 @@ jobs:
           else
             echo "⚠️  No tests found in PurchaseService"
           fi
-          
+
           # QueryService
           if [ -d "QueryService/src/test" ]; then
             echo "Testing QueryService..."
@@ -78,7 +78,7 @@ jobs:
           else
             echo "⚠️  No tests found in QueryService"
           fi
-          
+
           # RabbitCombinedConsumer
           if [ -d "RabbitCombinedConsumer/src/test" ]; then
             echo "Testing RabbitCombinedConsumer..."
@@ -90,7 +90,7 @@ jobs:
 
       - name: Test Summary
         if: always()
-        run:  |
+        run: |
           echo "✅ Test execution completed"
           echo ""
           echo "Note: If no tests were found, that's okay for this demo."
@@ -98,11 +98,16 @@ jobs:
   build:
     name: Build Java Services
     runs-on: ubuntu-latest
-    if: |
-      (github.event_name == 'workflow_dispatch' && 
-       (github.event.inputs.action == 'services-only' || github.event.inputs.action == 'full-deployment')) ||
-      (github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop'))
     needs: [test]
+    # Allow build to run even if test was skipped (for manual workflow_dispatch)
+    if: |
+      always() &&
+      (needs.test.result == 'success' || needs.test.result == 'skipped') &&
+      (
+        (github.event_name == 'workflow_dispatch' && 
+         (github.event.inputs.action == 'services-only' || github.event.inputs.action == 'full-deployment')) ||
+        (github.event_name == 'push' && (github.ref == 'refs/heads/Sujie-CI/CD' || github.ref == 'refs/heads/staging'))
+      )
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
@@ -334,13 +339,13 @@ jobs:
     needs: [build, terraform]
     if: |
       always() && 
-      (needs.build.result == 'success' || needs.build.result == 'skipped') && 
+      needs.build.result == 'success' && 
       (needs.terraform.result == 'success' || needs.terraform.result == 'skipped') &&
       (
         (github.event_name == 'workflow_dispatch' && 
          (github.event.inputs.action == 'services-only' || github.event.inputs.action == 'full-deployment')) ||
-        (github.event_name == 'push' && github.ref == 'refs/heads/develop') ||
-        (github.event_name == 'push' && github.ref == 'refs/heads/main')
+        (github.event_name == 'push' && github.ref == 'refs/heads/staging') ||
+        (github.event_name == 'push' && github.ref == 'refs/heads/Sujie-CI/CD')
       )
     steps:
       - uses: actions/checkout@v4
